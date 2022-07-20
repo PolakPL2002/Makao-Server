@@ -16,7 +16,6 @@ import tech.kucharski.makao.server.messages.HelloMessage;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static tech.kucharski.makao.util.Logger.*;
 import static tech.kucharski.makao.util.Utilities.validatePrimitives;
@@ -28,6 +27,8 @@ public class Server extends WebSocketServer {
     private final List<Client> clients = Collections.synchronizedList(new ArrayList<>());
     private final Timer heartbeatTimer = new Timer(true);
     private final UUID instanceUUID = UUID.randomUUID();
+    private final Map<UUID, Client> uuidClientMap = new HashMap<>();
+    private final Map<WebSocket, Client> webSocketClientMap = new HashMap<>();
 
     /**
      * Creates a WebSocketServer that will attempt to bind/listen on the given <var>address</var>.
@@ -124,15 +125,6 @@ public class Server extends WebSocketServer {
     }
 
     /**
-     * @param socket Socket of the client to find.
-     * @return A client or null if not found.
-     */
-    @Nullable
-    public Client getClient(@NotNull WebSocket socket) {
-        return clients.stream().filter(client -> client.getSocket() == socket).findAny().orElse(null);
-    }
-
-    /**
      * Called after an opening handshake has been performed and the given websocket is ready to be written on.
      *
      * @param conn      The <tt>WebSocket</tt> instance this event is occurring on.
@@ -145,6 +137,11 @@ public class Server extends WebSocketServer {
         clients.add(client);
         client.setSocket(conn);
         conn.setAttachment(client.getUUID());
+
+        //Update caches
+        uuidClientMap.put(client.getUUID(), client);
+        webSocketClientMap.put(conn, client);
+
         new HelloMessage(client.getUUID(), instanceUUID).send(conn);
     }
 
@@ -153,37 +150,11 @@ public class Server extends WebSocketServer {
      */
     @NotNull
     private UUID getUniqueClientID() {
-        AtomicReference<UUID> uuid = new AtomicReference<>();
+        UUID uuid;
         do {
-            uuid.set(UUID.randomUUID());
-        } while (clients.stream().anyMatch(client -> client.getUUID().equals(uuid.get())));
-        return uuid.get();
-    }
-
-    /**
-     * Called when the server started up successfully.
-     * <p>
-     * If any error occurred, onError is called instead.
-     */
-    @Override
-    public void onStart() {
-        heartbeatTimer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                heartbeat();
-            }
-        }, 2500, 2500);
-    }
-
-    /**
-     * Checks all connected clients for timeouts and sends heartbeat message to them.
-     */
-    private void heartbeat() {
-        clients.forEach(Client::checkTimeout);
-        clients.stream()
-                .filter(client -> client.getClientState() == ClientState.CONNECTED && client.getSocket() != null &&
-                        client.getSocket().isOpen())
-                .forEach(client -> new HeartbeatMessage().send(client.getSocket()));
+            uuid = UUID.randomUUID();
+        } while (uuidClientMap.containsKey(uuid));
+        return uuid;
     }
 
     /**
@@ -222,9 +193,48 @@ public class Server extends WebSocketServer {
             client.setSocket(null);
             removeClient(client);
 
+            webSocketClientMap.put(toClient.getSocket(), toClient);
+
             sendAck(toClient.getSocket(), reqID);
             log(String.format("[Server] Client %s is now known as %s.", client.getUUID(), toClient.getUUID()));
         }
+    }
+
+    /**
+     * Called when the server started up successfully.
+     * <p>
+     * If any error occurred, onError is called instead.
+     */
+    @Override
+    public void onStart() {
+        heartbeatTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                heartbeat();
+            }
+        }, 2500, 2500);
+    }
+
+    /**
+     * Removes a client.
+     *
+     * @param client Client to be removed.
+     */
+    private void removeClient(Client client) {
+        if (client == null) return;
+        //TODO Kick client from games
+        clients.remove(client);
+        uuidClientMap.remove(client.getUUID());
+        webSocketClientMap.remove(client.getSocket());
+    }
+
+    /**
+     * @param clientID ID of the client to find.
+     * @return A client or null if not found.
+     */
+    @Nullable
+    public Client getClient(@Nullable UUID clientID) {
+        return uuidClientMap.get(clientID);
     }
 
     /**
@@ -238,22 +248,22 @@ public class Server extends WebSocketServer {
     }
 
     /**
-     * Removes a client.
-     *
-     * @param client Client to be removed.
-     */
-    private void removeClient(Client client) {
-        if (client == null) return;
-        //TODO Kick client from games
-        clients.remove(client);
-    }
-
-    /**
-     * @param clientID ID of the client to find.
+     * @param socket Socket of the client to find.
      * @return A client or null if not found.
      */
     @Nullable
-    public Client getClient(@NotNull UUID clientID) {
-        return clients.stream().filter(client -> client.getUUID().equals(clientID)).findAny().orElse(null);
+    public Client getClient(@Nullable WebSocket socket) {
+        return webSocketClientMap.get(socket);
+    }
+
+    /**
+     * Checks all connected clients for timeouts and sends heartbeat message to them.
+     */
+    private void heartbeat() {
+        clients.forEach(Client::checkTimeout);
+        clients.stream()
+                .filter(client -> client.getClientState() == ClientState.CONNECTED &&
+                        client.getSocket() != null && client.getSocket().isOpen())
+                .forEach(client -> new HeartbeatMessage().send(client.getSocket()));
     }
 }

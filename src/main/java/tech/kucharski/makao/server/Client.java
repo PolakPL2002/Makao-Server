@@ -6,7 +6,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Date;
 import java.util.UUID;
 
-import static tech.kucharski.makao.util.Logger.warning;
+import static tech.kucharski.makao.util.Logger.log;
 
 /**
  * A network client.
@@ -31,7 +31,7 @@ public class Client {
     public void checkTimeout() {
         if (clientState == ClientState.CONNECTED) {
             if (new Date().getTime() - lastHeartbeat.getTime() > TIMEOUT_MS) {
-                warning("Client timed out.");
+                log("[Client] Client timed out.");
                 clientState = ClientState.DISCONNECTED;
                 if (socket != null) {
                     socket.close();
