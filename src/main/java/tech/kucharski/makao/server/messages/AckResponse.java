@@ -7,7 +7,7 @@ import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
- * Response with error code
+ * Empty response
  */
 public class AckResponse implements Message {
     @Nullable

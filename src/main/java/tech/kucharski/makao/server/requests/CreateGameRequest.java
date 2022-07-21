@@ -4,29 +4,29 @@ import com.google.gson.JsonObject;
 import org.java_websocket.WebSocket;
 import org.jetbrains.annotations.NotNull;
 import tech.kucharski.makao.Makao;
+import tech.kucharski.makao.game.PlayerInGameException;
 import tech.kucharski.makao.server.InvalidRequestException;
 import tech.kucharski.makao.server.Request;
 
 import java.util.UUID;
 
+import static tech.kucharski.makao.server.messages.ErrorResponse.BAD_REQUEST;
 import static tech.kucharski.makao.util.Utilities.validatePrimitives;
 
 /**
- * Changes ID of the client after reconnect.
+ * Creates a new game.
  */
-public class AuthRequest implements Request {
-    private final UUID clientID;
+public class CreateGameRequest implements Request {
     private final UUID reqID;
 
     /**
      * @param jsonObject Request data
      * @throws InvalidRequestException When data is invalid.
      */
-    public AuthRequest(JsonObject jsonObject) throws InvalidRequestException {
-        if (!validatePrimitives(jsonObject, new String[]{"clientID", "uuid"}))
+    public CreateGameRequest(JsonObject jsonObject) throws InvalidRequestException {
+        if (!validatePrimitives(jsonObject, new String[]{"uuid"}))
             throw new InvalidRequestException();
         try {
-            this.clientID = UUID.fromString(jsonObject.get("clientID").getAsJsonPrimitive().getAsString());
             this.reqID = UUID.fromString(jsonObject.get("uuid").getAsJsonPrimitive().getAsString());
         } catch (IllegalArgumentException ignored) {
             throw new InvalidRequestException();
@@ -35,6 +35,13 @@ public class AuthRequest implements Request {
 
     @Override
     public void handle(@NotNull WebSocket socket) {
-        Makao.getInstance().getServer().changeClientID(socket.getAttachment(), clientID, reqID);
+        //Currently a player is limited to being in one game at a time
+        try {
+            Makao.getInstance().getGameManager().createGame(socket.getAttachment());
+        } catch (PlayerInGameException e) {
+            Makao.getInstance().getServer().sendError(socket, reqID, BAD_REQUEST);
+            return;
+        }
+        Makao.getInstance().getServer().sendAck(socket, reqID);
     }
 }

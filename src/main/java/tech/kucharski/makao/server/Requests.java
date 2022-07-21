@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 import org.java_websocket.WebSocket;
 import org.jetbrains.annotations.NotNull;
 import tech.kucharski.makao.server.requests.AuthRequest;
+import tech.kucharski.makao.server.requests.CreateGameRequest;
+import tech.kucharski.makao.server.requests.GetGamesRequest;
 import tech.kucharski.makao.server.requests.HeartbeatRequest;
 
 import java.lang.reflect.Constructor;
@@ -20,7 +22,15 @@ public enum Requests {
     /**
      * Changes ID of the client after reconnect.
      */
-    AUTH(AuthRequest.class);
+    AUTH(AuthRequest.class),
+    /**
+     * Lists joinable games.
+     */
+    GET_GAMES(GetGamesRequest.class),
+    /**
+     * Creates a game.
+     */
+    CREATE_GAME(CreateGameRequest.class);
 
     private final Class<? extends Request> clazz;
 
@@ -55,7 +65,7 @@ public enum Requests {
                 throw (InvalidRequestException) e.getTargetException();
             throw e;
         }
-        request.handle(server, socket);
+        request.handle(socket);
     }
 
     /**

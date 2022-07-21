@@ -13,7 +13,6 @@ public class HeartbeatMessage implements Message {
     @Override
     public JsonObject toJSONObject() {
         JsonObject response = new JsonObject();
-        response.addProperty("success", true);
         response.addProperty("req", "HEARTBEAT");
 
         return response;

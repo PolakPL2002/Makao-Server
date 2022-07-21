@@ -30,7 +30,6 @@ public class HelloMessage implements Message {
     @Override
     public JsonObject toJSONObject() {
         JsonObject response = new JsonObject();
-        response.addProperty("success", true);
         response.addProperty("req", "HELLO");
         response.addProperty("clientID", clientID.toString());
         response.addProperty("serverID", serverID.toString());
