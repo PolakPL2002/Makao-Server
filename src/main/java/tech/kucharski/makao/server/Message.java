@@ -20,14 +20,24 @@ public interface Message {
      * @param conn Socket used to send the message.
      */
     default void send(@NotNull WebSocket conn) {
-        conn.send(encode());
+        final Client client = Makao.getInstance().getServer().getClient(conn);
+        synchronized (client == null ? new Object() : client.getLock()) {
+            conn.send(encode(conn));
+        }
     }
 
     /**
+     * @param conn Socket used to send the message.
      * @return JSON-encoded string
      */
-    default String encode() {
-        return toJSONObject().toString();
+    default String encode(@NotNull WebSocket conn) {
+        final JsonObject jsonObject = toJSONObject();
+        final Client client = Makao.getInstance().getServer().getClient(conn);
+        if (client != null) {
+            final int messageID = client.getMessageID();
+            jsonObject.addProperty("_msgID", messageID);
+        }
+        return jsonObject.toString();
     }
 
     /**

@@ -13,9 +13,11 @@ import static tech.kucharski.makao.util.Logger.log;
  */
 public class Client {
     private static final long TIMEOUT_MS = 10_000;
+    private final Object lock = new Object();
     private final UUID uuid;
     private ClientState clientState = ClientState.DISCONNECTED;
     private Date lastHeartbeat = new Date();
+    private int messageID = 0;
     private WebSocket socket = null;
 
     /**
@@ -53,6 +55,27 @@ public class Client {
      */
     public Date getLastHeartbeat() {
         return lastHeartbeat;
+    }
+
+    /**
+     * @return A lock object that can be used to synchronize sending messages.
+     */
+    public Object getLock() {
+        return lock;
+    }
+
+    /**
+     * @return Next message index
+     */
+    public int getMessageID() {
+        return messageID++;
+    }
+
+    /**
+     * @param messageID Next message index
+     */
+    public void setMessageID(int messageID) {
+        this.messageID = messageID;
     }
 
     /**
