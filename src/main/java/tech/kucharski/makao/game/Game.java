@@ -3,7 +3,9 @@ package tech.kucharski.makao.game;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import tech.kucharski.makao.Makao;
+import tech.kucharski.makao.server.Client;
 import tech.kucharski.makao.server.messages.GameRemovedMessage;
+import tech.kucharski.makao.server.messages.GameStateChangedMessage;
 import tech.kucharski.makao.util.JSONConvertible;
 
 import java.util.ArrayList;
@@ -17,6 +19,7 @@ import java.util.UUID;
 public class Game implements JSONConvertible {
     private final UUID gameID;
     private final List<Player> players = Collections.synchronizedList(new ArrayList<>());
+    private final TurnManager turnManager = new TurnManager();
     private Deck deck = null;
     /**
      * State of the game.
@@ -43,6 +46,8 @@ public class Game implements JSONConvertible {
 
         final Player player = new Player(Makao.getInstance().getGameManager().getUniquePlayerID(clientID));
         players.add(player);
+        turnManager.addPlayer(player.getUUID());
+        sendUpdate(player);
         //TODO Send update
         return player;
     }
@@ -52,6 +57,19 @@ public class Game implements JSONConvertible {
      */
     public GamePhase getGameState() {
         return gamePhase;
+    }
+
+    /**
+     * Sends a full update to a player.
+     *
+     * @param player Player that update should be sent to
+     */
+    private void sendUpdate(@NotNull Player player) {
+        final GameStateChangedMessage message = new GameStateChangedMessage(this);
+        final Client client = Makao.getInstance().getServer()
+                .getClient(Makao.getInstance().getGameManager().getClientID(player.getUUID()));
+        if (client != null)
+            message.send(client.getSocket());
     }
 
     /**
@@ -70,6 +88,27 @@ public class Game implements JSONConvertible {
     }
 
     /**
+     * Processes a turn.
+     */
+    public void nextTurn() {
+        turnManager.nextTurn();
+        sendUpdate();
+    }
+
+    /**
+     * Sends full update to all players.
+     */
+    private void sendUpdate() {
+        final GameStateChangedMessage message = new GameStateChangedMessage(this);
+        players.forEach(player -> {
+            final Client client = Makao.getInstance().getServer()
+                    .getClient(Makao.getInstance().getGameManager().getClientID(player.getUUID()));
+            if (client != null)
+                message.send(client.getSocket());
+        });
+    }
+
+    /**
      * @param player Player to be removed
      * @throws IllegalStateException When game is in incorrect phase.
      */
@@ -80,6 +119,7 @@ public class Game implements JSONConvertible {
         players.remove(player);
         if (deck != null)
             deck.removePlayer(player.getUUID());
+        sendUpdate();
         //TODO Send update
     }
 
@@ -90,12 +130,22 @@ public class Game implements JSONConvertible {
         if (getGameState() != GamePhase.PREPARING)
             throw new IllegalStateException("A game can only be started in preparing phase of the game.");
 
-        gamePhase = GamePhase.IN_GAME;
+        setGamePhase(GamePhase.IN_GAME);
 
         new GameRemovedMessage(this).broadcast();
 
         deck = new Deck((players.size() - 1) / 4 + 1);
         players.forEach(player -> deck.givePlayerCards(player.getUUID(), 5));
+    }
+
+    /**
+     * Sets a game phase.
+     *
+     * @param gamePhase New game phase.
+     */
+    private void setGamePhase(GamePhase gamePhase) {
+        this.gamePhase = gamePhase;
+        sendUpdate();
     }
 
     @Override
@@ -104,6 +154,7 @@ public class Game implements JSONConvertible {
 
         obj.addProperty("uuid", gameID.toString());
 
+        obj.addProperty("phase", gamePhase.name());
         obj.addProperty("players", players.size());
         return obj;
     }
