@@ -3,10 +3,7 @@ package tech.kucharski.makao.server;
 import com.google.gson.JsonObject;
 import org.java_websocket.WebSocket;
 import org.jetbrains.annotations.NotNull;
-import tech.kucharski.makao.server.requests.AuthRequest;
-import tech.kucharski.makao.server.requests.CreateGameRequest;
-import tech.kucharski.makao.server.requests.GetGamesRequest;
-import tech.kucharski.makao.server.requests.HeartbeatRequest;
+import tech.kucharski.makao.server.requests.*;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -30,7 +27,23 @@ public enum Requests {
     /**
      * Creates a game.
      */
-    CREATE_GAME(CreateGameRequest.class);
+    CREATE_GAME(CreateGameRequest.class),
+    /**
+     * Creates a new game.
+     */
+    PLAY_CARD(PlayCardRequest.class),
+    /**
+     * Starts a game.
+     */
+    START_GAME(StartGameRequest.class),
+    /**
+     * Asks the server to change the avatar of the user.
+     */
+    CHANGE_AVATAR(ChangeAvatarRequest.class),
+    /**
+     * Asks the server to change the name of the user.
+     */
+    CHANGE_NAME(ChangeNameRequest.class);
 
     private final Class<? extends Request> clazz;
 

@@ -231,6 +231,19 @@ public class Utilities {
      * @return Whether message contains all keys and they are primitives
      */
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public static boolean validatePrimitiveOrNull(@NotNull JsonObject message, @NotNull String[] keys) {
+        for (String key : keys)
+            if (!message.has(key) || !(message.get(key).isJsonPrimitive() || message.get(key).isJsonNull()))
+                return false;
+        return true;
+    }
+
+    /**
+     * @param message Message to validate
+     * @param keys    Keys to validate
+     * @return Whether message contains all keys and they are primitives
+     */
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean validatePrimitives(@NotNull JsonObject message, @NotNull String[] keys) {
         for (String key : keys)
             if (!message.has(key) || !message.get(key).isJsonPrimitive())

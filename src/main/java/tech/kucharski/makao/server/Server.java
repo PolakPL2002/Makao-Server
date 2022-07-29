@@ -8,10 +8,11 @@ import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import tech.kucharski.makao.server.messages.AckResponse;
-import tech.kucharski.makao.server.messages.ErrorResponse;
+import tech.kucharski.makao.server.messages.ClientInfoMessage;
 import tech.kucharski.makao.server.messages.HeartbeatMessage;
 import tech.kucharski.makao.server.messages.HelloMessage;
+import tech.kucharski.makao.server.messages.responses.AckResponse;
+import tech.kucharski.makao.server.messages.responses.ErrorResponse;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
@@ -123,10 +124,107 @@ public class Server extends WebSocketServer {
         try {
             request.handle(jsonObject, this, conn);
         } catch (NoSuchMethodException | InvocationTargetException | InstantiationException |
-                 IllegalAccessException | InvalidRequestException e) {
+                 IllegalAccessException e) {
             warning("[Server] Failed to handle request.");
             warning(e);
             sendError(conn, uuid, ErrorResponse.INTERNAL_SERVER_ERROR);
+        } catch (InvalidRequestException e) {
+            sendError(conn, uuid, ErrorResponse.BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Sends error to socket
+     *
+     * @param conn  Websocket
+     * @param uuid  Message UUID
+     * @param error Error
+     */
+    public void sendError(@NotNull WebSocket conn, @Nullable UUID uuid, @NotNull String error) {
+        new ErrorResponse(uuid, error).send(conn);
+    }
+
+    /**
+     * Called after an opening handshake has been performed and the given websocket is ready to be written on.
+     *
+     * @param conn      The <tt>WebSocket</tt> instance this event is occurring on.
+     * @param handshake The handshake of the websocket instance
+     */
+    @Override
+    public void onOpen(WebSocket conn, ClientHandshake handshake) {
+        Client client = new Client(getUniqueClientID());
+
+        log(String.format("[Server] Incoming connection %s (%s, %s)", conn.getRemoteSocketAddress(), client.getUUID(), client.getName()));
+
+        clients.add(client);
+        client.setSocket(conn);
+        conn.setAttachment(client.getUUID());
+
+        //Update caches
+        uuidClientMap.put(client.getUUID(), client);
+        webSocketClientMap.put(conn, client);
+
+        new HelloMessage(client.getUUID(), instanceUUID).send(conn);
+        new ClientInfoMessage(client).send(conn);
+    }
+
+    /**
+     * @return A unique UUID in the space of client IDs.
+     */
+    @NotNull
+    private UUID getUniqueClientID() {
+        UUID uuid;
+        do {
+            uuid = UUID.randomUUID();
+        } while (uuidClientMap.containsKey(uuid));
+        return uuid;
+    }
+
+    /**
+     * Called when the server started up successfully.
+     * <p>
+     * If any error occurred, onError is called instead.
+     */
+    @Override
+    public void onStart() {
+        heartbeatTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                heartbeat();
+            }
+        }, 2500, 2500);
+//        synchronized (clients) {
+//            for (int i = 0; i < 30; i++) {
+//                Client client = new Client(getUniqueClientID());
+//                uuidClientMap.put(client.getUUID(), client);
+//                clients.add(client);
+//            }
+//            for (Client client : new ArrayList<>(clients)) {
+//                try {
+//                    final Game game = Makao.getInstance().getGameManager().createGame(client.getUUID());
+//                    for (int i = 0; i < 6; i++) {
+//                        Client client1 = new Client(getUniqueClientID());
+//                        uuidClientMap.put(client1.getUUID(), client1);
+//                        clients.add(client1);
+//                        game.addPlayer(client1.getUUID());
+//                    }
+//                } catch (PlayerInGameException e) {
+//                    throw new RuntimeException(e);
+//                }
+//            }
+//        }
+    }
+
+    /**
+     * Checks all connected clients for timeouts and sends heartbeat message to them.
+     */
+    private void heartbeat() {
+        synchronized (clients) {
+            clients.forEach(Client::checkTimeout);
+            clients.stream()
+                    .filter(client -> client.getClientState() == ClientState.CONNECTED &&
+                            client.getSocket() != null && client.getSocket().isOpen())
+                    .forEach(client -> new HeartbeatMessage().send(client.getSocket()));
         }
     }
 
@@ -170,76 +268,9 @@ public class Server extends WebSocketServer {
             webSocketClientMap.put(toClient.getSocket(), toClient);
 
             sendAck(toClient.getSocket(), reqID);
+            new ClientInfoMessage(toClient).send(toClient.getSocket());
             log(String.format("[Server] Client %s is now known as %s.", client.getUUID(), toClient.getUUID()));
         }
-    }
-
-    /**
-     * Called after an opening handshake has been performed and the given websocket is ready to be written on.
-     *
-     * @param conn      The <tt>WebSocket</tt> instance this event is occurring on.
-     * @param handshake The handshake of the websocket instance
-     */
-    @Override
-    public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        Client client = new Client(getUniqueClientID());
-
-        log(String.format("[Server] Incoming connection %s (%s)", conn.getRemoteSocketAddress(), client.getUUID()));
-
-        clients.add(client);
-        client.setSocket(conn);
-        conn.setAttachment(client.getUUID());
-
-        //Update caches
-        uuidClientMap.put(client.getUUID(), client);
-        webSocketClientMap.put(conn, client);
-
-        new HelloMessage(client.getUUID(), instanceUUID).send(conn);
-    }
-
-    /**
-     * Sends error to socket
-     *
-     * @param conn  Websocket
-     * @param uuid  Message UUID
-     * @param error Error
-     */
-    public void sendError(@NotNull WebSocket conn, @Nullable UUID uuid, @NotNull String error) {
-        new ErrorResponse(uuid, error).send(conn);
-    }
-
-    /**
-     * Called when the server started up successfully.
-     * <p>
-     * If any error occurred, onError is called instead.
-     */
-    @Override
-    public void onStart() {
-        heartbeatTimer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                heartbeat();
-            }
-        }, 2500, 2500);
-    }
-
-    /**
-     * Checks all connected clients for timeouts and sends heartbeat message to them.
-     */
-    private void heartbeat() {
-        clients.forEach(Client::checkTimeout);
-        clients.stream()
-                .filter(client -> client.getClientState() == ClientState.CONNECTED &&
-                        client.getSocket() != null && client.getSocket().isOpen())
-                .forEach(client -> new HeartbeatMessage().send(client.getSocket()));
-    }
-
-    /**
-     * @return A list of all online clients.
-     */
-    public List<Client> getOnlineClients() {
-        return clients.stream().filter(client -> client.getClientState() == ClientState.CONNECTED)
-                .collect(Collectors.toList());
     }
 
     /**
@@ -275,14 +306,10 @@ public class Server extends WebSocketServer {
     }
 
     /**
-     * @return A unique UUID in the space of client IDs.
+     * @return A list of all online clients.
      */
-    @NotNull
-    private UUID getUniqueClientID() {
-        UUID uuid;
-        do {
-            uuid = UUID.randomUUID();
-        } while (uuidClientMap.containsKey(uuid));
-        return uuid;
+    public List<Client> getOnlineClients() {
+        return clients.stream().filter(client -> client.getClientState() == ClientState.CONNECTED)
+                .collect(Collectors.toList());
     }
 }

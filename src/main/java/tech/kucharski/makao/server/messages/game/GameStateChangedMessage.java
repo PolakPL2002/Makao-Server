@@ -1,4 +1,4 @@
-package tech.kucharski.makao.server.messages;
+package tech.kucharski.makao.server.messages.game;
 
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
@@ -6,7 +6,7 @@ import tech.kucharski.makao.game.Game;
 import tech.kucharski.makao.server.Message;
 
 /**
- * When  game was changed.
+ * When game was changed.
  */
 public class GameStateChangedMessage implements Message {
     @NotNull
@@ -25,8 +25,10 @@ public class GameStateChangedMessage implements Message {
     @Override
     public JsonObject toJSONObject() {
         JsonObject response = new JsonObject();
-        response.addProperty("req", "GAME_STATE_CHANGED_ADDED");
-        response.add("game", game.toJSONObject());
+        response.addProperty("req", "GAME.GAME_STATE_CHANGED");
+        response.addProperty("id", game.getGameID().toString());
+
+        response.add("game", game.toFullJSONObject());
 
         return response;
     }

@@ -1,14 +1,18 @@
 package tech.kucharski.makao.game;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import tech.kucharski.makao.util.JSONConvertible;
 
 import java.util.*;
 
 /**
  * Deck of cards
  */
-public class Deck {
+public class Deck implements JSONConvertible {
     private final List<Card> cards = Collections.synchronizedList(new ArrayList<>());
     private final List<UUID> discardedCards = Collections.synchronizedList(new ArrayList<>());
     private final Map<UUID, List<UUID>> playersCards = Collections.synchronizedMap(new HashMap<>());
@@ -137,14 +141,28 @@ public class Deck {
     }
 
     /**
+     * Plays a card.
+     *
+     * @param card Card to be played
+     */
+    public void playCard(@NotNull Card card) {
+        if (!cards.contains(card))
+            return;
+        for (List<UUID> value : playersCards.values()) {
+            value.remove(card.getUUID());
+        }
+        discardedCards.add(card.getUUID());
+    }
+
+    /**
      * @param player Player UUID
      * @param color  Card color
      * @return Whether player has a card of this color
      */
     public boolean playerHasCard(@NotNull UUID player, @NotNull Card.CardType.Color color) {
         checkPlayerExists(player);
-        final Card[] playerCards = getPlayerCards(player);
-        for (Card card : playerCards)
+        final List<UUID> playerCards = getPlayerCards(player);
+        for (Card card : playerCards.stream().map(this::getCardByUUID).toList())
             if (card.getType().getColor() == color)
                 return true;
         return false;
@@ -155,14 +173,10 @@ public class Deck {
      * @return Player cards
      */
     @NotNull
-    public Card[] getPlayerCards(@NotNull UUID uuid) {
+    public List<UUID> getPlayerCards(@NotNull UUID uuid) {
         checkPlayerExists(uuid);
-        final List<UUID> uuids = playersCards.get(uuid);
-        final Card[] out = new Card[uuids.size()];
-        int i = 0;
-        for (UUID uuid1 : uuids)
-            out[i++] = getCardByUUID(uuid1);
-        return out;
+
+        return new ArrayList<>(playersCards.get(uuid));
     }
 
     /**
@@ -172,8 +186,8 @@ public class Deck {
      */
     public boolean playerHasCard(@NotNull UUID player, @NotNull Card.CardType.Value value) {
         checkPlayerExists(player);
-        final Card[] playerCards = getPlayerCards(player);
-        for (Card card : playerCards)
+        final List<UUID> playerCards = getPlayerCards(player);
+        for (Card card : playerCards.stream().map(this::getCardByUUID).toList())
             if (card.getType().getValue() == value)
                 return true;
         return false;
@@ -187,8 +201,8 @@ public class Deck {
      */
     public boolean playerHasCard(@NotNull UUID player, @NotNull Card.CardType.Color color, @NotNull Card.CardType.Value value) {
         checkPlayerExists(player);
-        final Card[] playerCards = getPlayerCards(player);
-        for (Card card : playerCards)
+        final List<UUID> playerCards = getPlayerCards(player);
+        for (Card card : playerCards.stream().map(this::getCardByUUID).toList())
             if (card.getType().getColor() == color && card.getType().getValue() == value)
                 return true;
         return false;
@@ -200,6 +214,38 @@ public class Deck {
     public void removePlayer(UUID playerUUID) {
         discardedCards.addAll(playersCards.get(playerUUID));
         playersCards.remove(playerUUID);
+    }
+
+    /**
+     * @return JSON representation of the object.
+     */
+    @Override
+    public JsonObject toJSONObject() {
+        JsonObject obj = new JsonObject();
+
+        JsonArray cards = new JsonArray();
+        this.cards.forEach(card -> cards.add(card.toJSONObject()));
+
+        obj.add("cards", cards);
+
+        JsonArray discardedCards = new JsonArray();
+        this.discardedCards.forEach(uuid -> discardedCards.add(uuid.toString()));
+
+        obj.add("discardedCards", discardedCards);
+        return obj;
+    }
+
+    /**
+     * @return Simplified JSON data.
+     */
+    public JsonElement toSimpleJSONObject() {
+        JsonObject obj = new JsonObject();
+
+        JsonArray discardedCards = new JsonArray();
+        this.discardedCards.forEach(uuid -> discardedCards.add(uuid.toString()));
+
+        obj.add("discardedCards", discardedCards);
+        return obj;
     }
 
     /**

@@ -3,6 +3,7 @@ package tech.kucharski.makao.game;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import tech.kucharski.makao.server.messages.GameAddedMessage;
+import tech.kucharski.makao.server.messages.GameRemovedMessage;
 
 import java.util.*;
 
@@ -15,6 +16,7 @@ public class GameManager {
      * Map that maps player UUIDs to client UUIDs.
      */
     private final Map<UUID, UUID> playerClientMap = Collections.synchronizedMap(new HashMap<>());
+    private final Map<UUID, Game> playerGameMap = Collections.synchronizedMap(new HashMap<>());
     private final Set<UUID> usedGameIDs = Collections.synchronizedSet(new HashSet<>());
 
     /**
@@ -64,6 +66,15 @@ public class GameManager {
     }
 
     /**
+     * @param playerID Player UUID
+     * @return Game of the player or null
+     */
+    @Nullable
+    public Game getGame(@NotNull UUID playerID) {
+        return playerGameMap.get(playerID);
+    }
+
+    /**
      * @return List of joinable games.
      */
     public List<Game> getJoinableGames() {
@@ -71,15 +82,17 @@ public class GameManager {
     }
 
     /**
-     * Creates a unique player ID and associates it with client ID.
+     * Creates a unique player ID and associates it with client ID and game.
      *
      * @param clientID Client ID to be associated with the newly created player ID.
+     * @param game     Game to be associated with newly created player ID.
      * @return A unique UUID in the space of player IDs.
      */
-    public UUID getUniquePlayerID(UUID clientID) {
+    public UUID getUniquePlayerID(@NotNull UUID clientID, @NotNull Game game) {
         synchronized (playerClientMap) {
             final UUID id = getUniquePlayerID();
             playerClientMap.put(id, clientID);
+            playerGameMap.put(id, game);
             return id;
         }
     }
@@ -96,5 +109,13 @@ public class GameManager {
             } while (playerClientMap.containsKey(uuid));
             return uuid;
         }
+    }
+
+    /**
+     * @param game Game to be removed.
+     */
+    public void removeGame(@NotNull Game game) {
+        games.remove(game);
+        new GameRemovedMessage(game).broadcast();
     }
 }

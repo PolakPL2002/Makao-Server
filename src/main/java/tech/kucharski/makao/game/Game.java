@@ -1,11 +1,15 @@
 package tech.kucharski.makao.game;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import tech.kucharski.makao.Makao;
 import tech.kucharski.makao.server.Client;
+import tech.kucharski.makao.server.ClientState;
+import tech.kucharski.makao.server.Message;
 import tech.kucharski.makao.server.messages.GameRemovedMessage;
-import tech.kucharski.makao.server.messages.GameStateChangedMessage;
+import tech.kucharski.makao.server.messages.game.*;
 import tech.kucharski.makao.util.JSONConvertible;
 
 import java.util.ArrayList;
@@ -17,10 +21,12 @@ import java.util.UUID;
  * A game of Makao.
  */
 public class Game implements JSONConvertible {
+    private final List<CardValidator> cardValidators = Collections.synchronizedList(new ArrayList<>());
     private final UUID gameID;
     private final List<Player> players = Collections.synchronizedList(new ArrayList<>());
     private final TurnManager turnManager = new TurnManager();
     private Deck deck = null;
+    private boolean drawnCard = false;
     /**
      * State of the game.
      */
@@ -44,11 +50,12 @@ public class Game implements JSONConvertible {
         if (getGameState() != GamePhase.PREPARING)
             throw new IllegalStateException("A player can only be added in preparing phase of the game.");
 
-        final Player player = new Player(Makao.getInstance().getGameManager().getUniquePlayerID(clientID));
+        final Player player = new Player(Makao.getInstance().getGameManager().getUniquePlayerID(clientID, this));
         players.add(player);
         turnManager.addPlayer(player.getUUID());
+        send(player, new PlayerIDAssignedMessage(this, player));
         sendUpdate(player);
-        //TODO Send update
+        sendAll(new PlayerJoinedMessage(this, player));
         return player;
     }
 
@@ -66,10 +73,81 @@ public class Game implements JSONConvertible {
      */
     private void sendUpdate(@NotNull Player player) {
         final GameStateChangedMessage message = new GameStateChangedMessage(this);
+        send(player, message);
+    }
+
+    /**
+     * Sends a message to a player.
+     *
+     * @param player  Player the message shall be sent to.
+     * @param message A message.
+     */
+    private void send(@NotNull Player player, Message message) {
         final Client client = Makao.getInstance().getServer()
                 .getClient(Makao.getInstance().getGameManager().getClientID(player.getUUID()));
-        if (client != null)
+        if (client != null && client.getClientState() == ClientState.CONNECTED)
             message.send(client.getSocket());
+    }
+
+    /**
+     * Sends a message to all players.
+     *
+     * @param message Message to be sent.
+     */
+    private void sendAll(@NotNull final Message message) {
+        players.forEach(player -> send(player, message));
+    }
+
+    /**
+     * @param playerID ID to check
+     * @return If player is an admin.
+     */
+    public boolean checkAdmin(@NotNull UUID playerID) {
+        if (players.size() == 0) return false;
+        return players.get(0).getUUID().equals(playerID);
+    }
+
+    /**
+     * @param playerID Player drawing a card.
+     * @throws PlayerNotFoundException Player wasn't found.
+     * @throws WrongTurnException      It's not player's turn.
+     * @throws IllegalStateException   Player has already drawn a card in this turn.
+     */
+    public void drawCard(UUID playerID) throws PlayerNotFoundException, WrongTurnException, IllegalStateException {
+        final Player player = getPlayer(playerID);
+        if (player == null)
+            throw new PlayerNotFoundException();
+        if (!turnManager.getCurrentPlayer().equals(playerID))
+            throw new WrongTurnException();
+        if (drawnCard)
+            throw new IllegalStateException();
+        drawnCard = true;
+        deck.givePlayerCards(playerID, 1);
+        sendUpdatedCardsToPlayer(player);
+    }
+
+    /**
+     * @param playerID Player ID
+     * @return A player if found
+     */
+    @Nullable
+    private Player getPlayer(UUID playerID) {
+        return players.stream().filter(player -> player.getUUID().equals(playerID)).findFirst().orElse(null);
+    }
+
+    /**
+     * @param player Player the cards should be sent to.
+     */
+    private void sendUpdatedCardsToPlayer(@NotNull Player player) {
+        send(player, new SelfCardsUpdatedMessage(this, deck.getPlayerCards(player.getUUID())));
+    }
+
+    /**
+     * @return A deck
+     */
+    @Nullable
+    public Deck getDeck() {
+        return deck;
     }
 
     /**
@@ -77,6 +155,13 @@ public class Game implements JSONConvertible {
      */
     public UUID getGameID() {
         return gameID;
+    }
+
+    /**
+     * @return Current player ID.
+     */
+    public UUID getTurn() {
+        return turnManager.getCurrentPlayer();
     }
 
     /**
@@ -88,24 +173,52 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * Processes a turn.
+     * @param playerID Player playing a card.
+     * @param cardID   A card being played.
+     * @param request  Requested value (for supported cards)
+     * @throws PlayerNotFoundException Player wasn't found.
+     * @throws CardNotFoundException   Card wasn't found.
+     * @throws InvalidCardException    Card cannot be played right now.
+     * @throws WrongTurnException      It's not player's turn.
      */
-    public void nextTurn() {
-        turnManager.nextTurn();
-        sendUpdate();
+    public void playCard(@NotNull UUID playerID, @NotNull UUID cardID, @Nullable String request) throws PlayerNotFoundException,
+            CardNotFoundException, InvalidCardException, WrongTurnException {
+        final Player player = getPlayer(playerID);
+        if (player == null)
+            throw new PlayerNotFoundException();
+        final Card card = deck.getCardByUUID(cardID);
+        if (card == null)
+            throw new CardNotFoundException();
+        if (!validateCard(card))
+            throw new InvalidCardException();
+        if (!turnManager.getCurrentPlayer().equals(playerID))
+            throw new WrongTurnException();
+        deck.playCard(card);
+        sendAll(new DeckUpdatedMessage(this));
+        sendUpdatedCardsToPlayer(player);
+        nextTurn();
     }
 
     /**
-     * Sends full update to all players.
+     * Processes a turn.
      */
-    private void sendUpdate() {
-        final GameStateChangedMessage message = new GameStateChangedMessage(this);
-        players.forEach(player -> {
-            final Client client = Makao.getInstance().getServer()
-                    .getClient(Makao.getInstance().getGameManager().getClientID(player.getUUID()));
-            if (client != null)
-                message.send(client.getSocket());
-        });
+    public void nextTurn() {
+        drawnCard = false;
+        turnManager.nextTurn();
+        sendAll(new NextTurnMessage(this));
+        //TODO Start timer
+
+    }
+
+    /**
+     * @param card Card to be validated.
+     * @return Whether card can be played.
+     */
+    private boolean validateCard(@NotNull Card card) {
+        for (CardValidator cardValidator : cardValidators) {
+            if (cardValidator.validate(card)) return true;
+        }
+        return false;
     }
 
     /**
@@ -119,8 +232,10 @@ public class Game implements JSONConvertible {
         players.remove(player);
         if (deck != null)
             deck.removePlayer(player.getUUID());
-        sendUpdate();
-        //TODO Send update
+        sendAll(new PlayerLeftMessage(this, player));
+        if (players.size() == 0) {
+            Makao.getInstance().getGameManager().removeGame(this);
+        }
     }
 
     /**
@@ -135,7 +250,57 @@ public class Game implements JSONConvertible {
         new GameRemovedMessage(this).broadcast();
 
         deck = new Deck((players.size() - 1) / 4 + 1);
-        players.forEach(player -> deck.givePlayerCards(player.getUUID(), 5));
+        players.forEach(player -> {
+            deck.givePlayerCards(player.getUUID(), 5);
+            sendUpdatedCardsToPlayer(player);
+        });
+        cardValidators.add(new SameColorValidator(deck.getCurrentTopCard()));
+        cardValidators.add(new SameValueValidator(deck.getCurrentTopCard()));
+        sendUpdate();
+        nextTurn();
+    }
+
+    /**
+     * @return A JSON object with all data.
+     */
+    public JsonObject toFullJSONObject() {
+        JsonObject obj = new JsonObject();
+
+        obj.addProperty("uuid", gameID.toString());
+
+        obj.addProperty("phase", gamePhase.name());
+
+        JsonArray players = new JsonArray();
+        this.players.forEach(player -> players.add(player.toJSONObject()));
+
+        obj.add("deck", deck != null ? deck.toJSONObject() : null);
+
+        obj.add("players", players);
+
+        obj.addProperty("turnOf", turnManager.getCurrentPlayer().toString());
+        return obj;
+    }
+
+    @Override
+    public JsonObject toJSONObject() {
+        JsonObject obj = new JsonObject();
+
+        obj.addProperty("uuid", gameID.toString());
+
+        obj.addProperty("phase", gamePhase.name());
+
+        JsonArray players = new JsonArray();
+        this.players.forEach(player -> players.add(player.toJSONObject()));
+
+        obj.add("players", players);
+        return obj;
+    }
+
+    /**
+     * Sends full update to all players.
+     */
+    private void sendUpdate() {
+        sendAll(new GameStateChangedMessage(this));
     }
 
     /**
@@ -146,16 +311,5 @@ public class Game implements JSONConvertible {
     private void setGamePhase(GamePhase gamePhase) {
         this.gamePhase = gamePhase;
         sendUpdate();
-    }
-
-    @Override
-    public JsonObject toJSONObject() {
-        JsonObject obj = new JsonObject();
-
-        obj.addProperty("uuid", gameID.toString());
-
-        obj.addProperty("phase", gamePhase.name());
-        obj.addProperty("players", players.size());
-        return obj;
     }
 }

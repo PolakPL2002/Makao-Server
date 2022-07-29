@@ -10,7 +10,7 @@ import tech.kucharski.makao.server.Request;
 
 import java.util.UUID;
 
-import static tech.kucharski.makao.server.messages.ErrorResponse.BAD_REQUEST;
+import static tech.kucharski.makao.server.messages.responses.ErrorResponse.FORBIDDEN;
 import static tech.kucharski.makao.util.Utilities.validatePrimitives;
 
 /**
@@ -39,7 +39,7 @@ public class CreateGameRequest implements Request {
         try {
             Makao.getInstance().getGameManager().createGame(socket.getAttachment());
         } catch (PlayerInGameException e) {
-            Makao.getInstance().getServer().sendError(socket, reqID, BAD_REQUEST);
+            Makao.getInstance().getServer().sendError(socket, reqID, FORBIDDEN);
             return;
         }
         Makao.getInstance().getServer().sendAck(socket, reqID);

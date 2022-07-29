@@ -1,4 +1,4 @@
-package tech.kucharski.makao.server.messages;
+package tech.kucharski.makao.server.messages.responses;
 
 import com.google.gson.JsonObject;
 import tech.kucharski.makao.server.Message;
