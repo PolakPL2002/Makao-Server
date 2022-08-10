@@ -4,10 +4,12 @@ import com.google.gson.JsonObject;
 import org.java_websocket.WebSocket;
 import org.jetbrains.annotations.NotNull;
 import tech.kucharski.makao.Makao;
+import tech.kucharski.makao.game.GamePhase;
 import tech.kucharski.makao.server.Client;
 import tech.kucharski.makao.server.InvalidRequestException;
 import tech.kucharski.makao.server.Request;
 import tech.kucharski.makao.server.messages.ClientInfoMessage;
+import tech.kucharski.makao.server.messages.GameUpdatedMessage;
 
 import java.util.UUID;
 
@@ -39,6 +41,9 @@ public class ChangeAvatarRequest implements Request {
         if (client != null) {
             client.setAvatar(UUID.randomUUID());
             new ClientInfoMessage(client).send(client.getSocket());
+            Makao.getInstance().getGameManager().getClientGames(client.getUUID()).stream()
+                    .filter(game -> game.getGameState() == GamePhase.PREPARING)
+                    .forEach(game -> new GameUpdatedMessage(game).broadcast());
             Makao.getInstance().getServer().sendAck(socket, reqID);
         }
     }

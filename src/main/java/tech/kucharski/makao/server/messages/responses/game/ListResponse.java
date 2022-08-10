@@ -1,4 +1,4 @@
-package tech.kucharski.makao.server.messages.responses;
+package tech.kucharski.makao.server.messages.responses.game;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -10,9 +10,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Response for {@link tech.kucharski.makao.server.requests.GetGamesRequest}.
+ * Response for {@link tech.kucharski.makao.server.requests.game.ListRequest}.
  */
-public class GetGamesResponse implements Message {
+public class ListResponse implements Message {
     @NotNull
     private final List<Game> games;
     @NotNull
@@ -20,9 +20,9 @@ public class GetGamesResponse implements Message {
 
     /**
      * @param requestUUID UUID of request this response is to.
-     * @param games       List of games.
+     * @param games       List of the games
      */
-    public GetGamesResponse(@NotNull UUID requestUUID, @NotNull List<Game> games) {
+    public ListResponse(@NotNull UUID requestUUID, @NotNull List<Game> games) {
         this.requestUUID = requestUUID;
         this.games = games;
     }
@@ -36,9 +36,8 @@ public class GetGamesResponse implements Message {
         response.addProperty("success", true);
         response.addProperty("req", requestUUID.toString());
 
-        final JsonArray games = new JsonArray();
+        JsonArray games = new JsonArray();
         this.games.forEach(game -> games.add(game.toJSONObject()));
-
         response.add("games", games);
 
         return response;

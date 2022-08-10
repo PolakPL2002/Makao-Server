@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import org.java_websocket.WebSocket;
 import org.jetbrains.annotations.NotNull;
 import tech.kucharski.makao.server.requests.*;
+import tech.kucharski.makao.server.requests.game.*;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -29,13 +30,29 @@ public enum Requests {
      */
     CREATE_GAME(CreateGameRequest.class),
     /**
-     * Creates a new game.
+     * Plays a card in a game.
      */
-    PLAY_CARD(PlayCardRequest.class),
+    GAME__PLAY_CARD(PlayCardRequest.class),
+    /**
+     * Plays a card in a game.
+     */
+    GAME__DRAW_CARD(DrawCardRequest.class),
     /**
      * Starts a game.
      */
-    START_GAME(StartGameRequest.class),
+    GAME__START_GAME(StartGameRequest.class),
+    /**
+     * Lists all games the client takes part in.
+     */
+    GAME__LIST(ListRequest.class),
+    /**
+     * Makes player join a game.
+     */
+    GAME__JOIN(JoinRequest.class),
+    /**
+     * Sends full update of the game to the client.
+     */
+    GAME__UPDATE(UpdateRequest.class),
     /**
      * Asks the server to change the avatar of the user.
      */

@@ -8,6 +8,7 @@ import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import tech.kucharski.makao.Makao;
 import tech.kucharski.makao.server.messages.ClientInfoMessage;
 import tech.kucharski.makao.server.messages.HeartbeatMessage;
 import tech.kucharski.makao.server.messages.HelloMessage;
@@ -104,7 +105,7 @@ public class Server extends WebSocketServer {
             sendError(conn, null, ErrorResponse.BAD_REQUEST);
             return;
         }
-        String req = jsonObject.get("req").getAsJsonPrimitive().getAsString();
+        String req = jsonObject.get("req").getAsJsonPrimitive().getAsString().replace(".", "__");
         UUID uuid;
         try {
             uuid = UUID.fromString(jsonObject.get("uuid").getAsJsonPrimitive().getAsString());
@@ -280,7 +281,7 @@ public class Server extends WebSocketServer {
      */
     private void removeClient(Client client) {
         if (client == null) return;
-        //TODO Kick client from games
+        Makao.getInstance().getGameManager().onClientRemoved(client);
         clients.remove(client);
         uuidClientMap.remove(client.getUUID());
         webSocketClientMap.remove(client.getSocket());

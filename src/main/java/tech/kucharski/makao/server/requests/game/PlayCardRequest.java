@@ -1,4 +1,4 @@
-package tech.kucharski.makao.server.requests;
+package tech.kucharski.makao.server.requests.game;
 
 import com.google.gson.JsonObject;
 import org.java_websocket.WebSocket;
@@ -15,7 +15,7 @@ import static tech.kucharski.makao.util.Utilities.validatePrimitiveOrNull;
 import static tech.kucharski.makao.util.Utilities.validatePrimitives;
 
 /**
- * Creates a new game.
+ * Plays a card in a game.
  */
 public class PlayCardRequest implements Request {
     private final UUID reqID, playerID, card;
@@ -43,7 +43,7 @@ public class PlayCardRequest implements Request {
 
     @Override
     public void handle(@NotNull WebSocket socket) {
-        final Game game = Makao.getInstance().getGameManager().getGame(playerID);
+        final Game game = Makao.getInstance().getGameManager().getGameByPlayerID(playerID);
         if (game == null) {
             Makao.getInstance().getServer().sendError(socket, reqID, ErrorResponse.NOT_FOUND);
             return;

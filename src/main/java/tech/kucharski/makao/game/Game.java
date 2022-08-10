@@ -9,13 +9,11 @@ import tech.kucharski.makao.server.Client;
 import tech.kucharski.makao.server.ClientState;
 import tech.kucharski.makao.server.Message;
 import tech.kucharski.makao.server.messages.GameRemovedMessage;
+import tech.kucharski.makao.server.messages.GameUpdatedMessage;
 import tech.kucharski.makao.server.messages.game.*;
 import tech.kucharski.makao.util.JSONConvertible;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * A game of Makao.
@@ -27,6 +25,7 @@ public class Game implements JSONConvertible {
     private final TurnManager turnManager = new TurnManager();
     private Deck deck = null;
     private boolean drawnCard = false;
+    private final Map<UUID, UUID> clientPlayerMap = Collections.synchronizedMap(new HashMap<>());
     /**
      * State of the game.
      */
@@ -52,10 +51,12 @@ public class Game implements JSONConvertible {
 
         final Player player = new Player(Makao.getInstance().getGameManager().getUniquePlayerID(clientID, this));
         players.add(player);
+        clientPlayerMap.put(clientID, player.getUUID());
         turnManager.addPlayer(player.getUUID());
         send(player, new PlayerIDAssignedMessage(this, player));
         sendUpdate(player);
         sendAll(new PlayerJoinedMessage(this, player));
+        new GameUpdatedMessage(this).broadcast();
         return player;
     }
 
@@ -64,6 +65,38 @@ public class Game implements JSONConvertible {
      */
     public GamePhase getGameState() {
         return gamePhase;
+    }
+
+    /**
+     * @param clientID Client ID
+     * @return Player ID
+     */
+    @Nullable
+    public UUID getPlayerID(UUID clientID) {
+        return clientPlayerMap.get(clientID);
+    }
+
+    /**
+     * @param uuid Player to be removed
+     * @throws IllegalStateException When game is in incorrect phase.
+     */
+    public void removePlayer(@NotNull UUID uuid) throws IllegalStateException {
+        if (getGameState() != GamePhase.PREPARING && getGameState() != GamePhase.IN_GAME)
+            throw new IllegalStateException(String.format("A player cannot be removed in %s phase of the game.", getGameState()));
+
+        final Player player = getPlayer(uuid);
+        if (player == null) return;
+
+        players.remove(player);
+        if (deck != null)
+            deck.removePlayer(player.getUUID());
+        Makao.getInstance().getGameManager().removePlayer(uuid);
+        sendAll(new PlayerLeftMessage(this, player));
+        if (getGameState() == GamePhase.PREPARING)
+            new GameUpdatedMessage(this).broadcast();
+        if (players.size() == 0) {
+            Makao.getInstance().getGameManager().removeGame(this);
+        }
     }
 
     /**
@@ -136,10 +169,25 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * @param player Player the cards should be sent to.
+     * @throws IllegalStateException When game is in incorrect state.
      */
-    private void sendUpdatedCardsToPlayer(@NotNull Player player) {
-        send(player, new SelfCardsUpdatedMessage(this, deck.getPlayerCards(player.getUUID())));
+    public void startGame() throws IllegalStateException {
+        if (getGameState() != GamePhase.PREPARING)
+            throw new IllegalStateException("A game can only be started in preparing phase of the game.");
+
+        setGamePhase(GamePhase.IN_GAME);
+
+        new GameRemovedMessage(this).broadcast();
+
+        deck = new Deck((players.size() - 1) / 4 + 1);
+        sendUpdate();
+        players.forEach(player -> {
+            deck.givePlayerCards(player.getUUID(), 20);
+            sendUpdatedCardsToPlayer(player);
+        });
+        cardValidators.add(new SameColorValidator(deck.getCurrentTopCard()));
+        cardValidators.add(new SameValueValidator(deck.getCurrentTopCard()));
+        nextTurn();
     }
 
     /**
@@ -222,42 +270,22 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * @param player Player to be removed
-     * @throws IllegalStateException When game is in incorrect phase.
+     * @param player Player the cards should be sent to.
      */
-    public void removePlayer(@NotNull Player player) throws IllegalStateException {
-        if (getGameState() != GamePhase.PREPARING && getGameState() != GamePhase.IN_GAME)
-            throw new IllegalStateException(String.format("A player cannot be removed in %s phase of the game.", getGameState()));
-
-        players.remove(player);
-        if (deck != null)
-            deck.removePlayer(player.getUUID());
-        sendAll(new PlayerLeftMessage(this, player));
-        if (players.size() == 0) {
-            Makao.getInstance().getGameManager().removeGame(this);
-        }
+    private void sendUpdatedCardsToPlayer(@NotNull Player player) {
+        if (deck == null) return;
+        send(player, new SelfCardsUpdatedMessage(this, deck.getPlayerCards(player.getUUID())));
     }
 
     /**
-     * @throws IllegalStateException When game is in incorrect state.
+     * @param playerID Player to be updated
      */
-    public void startGame() throws IllegalStateException {
-        if (getGameState() != GamePhase.PREPARING)
-            throw new IllegalStateException("A game can only be started in preparing phase of the game.");
+    public void updatePlayer(UUID playerID) {
+        final Player player = getPlayer(playerID);
+        if (player == null) return;
 
-        setGamePhase(GamePhase.IN_GAME);
-
-        new GameRemovedMessage(this).broadcast();
-
-        deck = new Deck((players.size() - 1) / 4 + 1);
-        players.forEach(player -> {
-            deck.givePlayerCards(player.getUUID(), 5);
-            sendUpdatedCardsToPlayer(player);
-        });
-        cardValidators.add(new SameColorValidator(deck.getCurrentTopCard()));
-        cardValidators.add(new SameValueValidator(deck.getCurrentTopCard()));
-        sendUpdate();
-        nextTurn();
+        sendUpdate(player);
+        sendUpdatedCardsToPlayer(player);
     }
 
     /**

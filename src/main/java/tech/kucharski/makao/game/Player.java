@@ -36,7 +36,7 @@ public class Player implements JSONConvertible {
         JsonObject obj = new JsonObject();
 
         obj.addProperty("uuid", uuid.toString());
-        final Game game = Makao.getInstance().getGameManager().getGame(uuid);
+        final Game game = Makao.getInstance().getGameManager().getGameByPlayerID(uuid);
         if (game != null) {
             final Deck deck = game.getDeck();
             if (deck != null) {
