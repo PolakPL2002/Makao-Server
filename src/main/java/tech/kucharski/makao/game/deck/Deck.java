@@ -1,4 +1,4 @@
-package tech.kucharski.makao.game;
+package tech.kucharski.makao.game.deck;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -13,7 +13,7 @@ import java.util.*;
  * Deck of cards
  */
 public class Deck implements JSONConvertible {
-    private final Map<Card.CardType, CardSettings> cardSettings;
+    private final Map<CardType, CardSettings> cardSettings;
     private final List<Card> cards = Collections.synchronizedList(new ArrayList<>());
     private final List<UUID> discardedCards = Collections.synchronizedList(new ArrayList<>());
     private final Map<UUID, List<UUID>> playersCards = Collections.synchronizedMap(new HashMap<>());
@@ -23,12 +23,12 @@ public class Deck implements JSONConvertible {
      * @param numberOfDecks Number of decks of cards to use
      * @param cardSettings  Card settings to be used with the deck
      */
-    public Deck(int numberOfDecks, Map<Card.CardType, CardSettings> cardSettings) {
+    public Deck(int numberOfDecks, Map<CardType, CardSettings> cardSettings) {
         this.cardSettings = cardSettings;
         if (numberOfDecks < 1) numberOfDecks = 1;
 
         for (int i = 0; i < numberOfDecks; i++) {
-            for (Card.CardType type : Card.CardType.values())
+            for (CardType type : CardType.values())
                 cards.add(new Card(uniqueUUID(), type));
         }
 
@@ -72,9 +72,9 @@ public class Deck implements JSONConvertible {
 
     /**
      * @param type Type of the {@link Card} that {@link CardSettings} should be returned for.
-     * @return {@link CardSettings} of {@link Card.CardType}.
+     * @return {@link CardSettings} of {@link CardType}.
      */
-    private CardSettings getCardSettings(@NotNull Card.CardType type) {
+    private CardSettings getCardSettings(@NotNull CardType type) {
         return cardSettings.getOrDefault(type, type.getDefaultSettings());
     }
 
@@ -153,7 +153,7 @@ public class Deck implements JSONConvertible {
      * @return Whether player has a card of this color
      */
     @SuppressWarnings("unused")
-    public boolean playerHasCard(@NotNull UUID player, @NotNull Card.CardType.Color color) {
+    public boolean playerHasCard(@NotNull UUID player, @NotNull CardColor color) {
         final List<Card> playerCards = getPlayerCards(player);
         for (Card card : playerCards)
             if (card.getType().getColor() == color)
@@ -196,7 +196,7 @@ public class Deck implements JSONConvertible {
      * @return Whether player has a card of this value
      */
     @SuppressWarnings("unused")
-    public boolean playerHasCard(@NotNull UUID player, @NotNull Card.CardType.Value value) {
+    public boolean playerHasCard(@NotNull UUID player, @NotNull CardValue value) {
         final List<Card> playerCards = getPlayerCards(player);
         for (Card card : playerCards)
             if (card.getType().getValue() == value)
@@ -211,7 +211,7 @@ public class Deck implements JSONConvertible {
      * @return Whether player has a card of this color and value
      */
     @SuppressWarnings("unused")
-    public boolean playerHasCard(@NotNull UUID player, @NotNull Card.CardType.Color color, @NotNull Card.CardType.Value value) {
+    public boolean playerHasCard(@NotNull UUID player, @NotNull CardColor color, @NotNull CardValue value) {
         final List<Card> playerCards = getPlayerCards(player);
         for (Card card : playerCards)
             if (card.getType().getColor() == color && card.getType().getValue() == value)

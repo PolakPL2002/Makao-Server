@@ -1,6 +1,7 @@
-package tech.kucharski.makao.game;
+package tech.kucharski.makao.game.deck;
 
 import com.google.gson.JsonObject;
+import tech.kucharski.makao.game.validators.ValidatorPreset;
 import tech.kucharski.makao.util.JSONConvertible;
 
 /**

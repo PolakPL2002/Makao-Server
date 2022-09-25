@@ -1,4 +1,4 @@
-package tech.kucharski.makao.game;
+package tech.kucharski.makao.game.exceptions;
 
 /**
  * The card wasn't found.

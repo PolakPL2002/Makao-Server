@@ -1,6 +1,7 @@
-package tech.kucharski.makao.game;
+package tech.kucharski.makao.game.validators;
 
 import org.jetbrains.annotations.NotNull;
+import tech.kucharski.makao.game.deck.Card;
 
 /**
  * Performs 'and' operation on other validators.

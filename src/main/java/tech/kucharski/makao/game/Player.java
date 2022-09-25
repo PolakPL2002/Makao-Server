@@ -2,6 +2,7 @@ package tech.kucharski.makao.game;
 
 import com.google.gson.JsonObject;
 import tech.kucharski.makao.Makao;
+import tech.kucharski.makao.game.deck.Deck;
 import tech.kucharski.makao.server.Client;
 import tech.kucharski.makao.util.JSONConvertible;
 

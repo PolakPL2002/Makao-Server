@@ -5,6 +5,12 @@ import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import tech.kucharski.makao.Makao;
+import tech.kucharski.makao.game.deck.*;
+import tech.kucharski.makao.game.exceptions.CardNotFoundException;
+import tech.kucharski.makao.game.exceptions.InvalidCardException;
+import tech.kucharski.makao.game.exceptions.PlayerNotFoundException;
+import tech.kucharski.makao.game.exceptions.WrongTurnException;
+import tech.kucharski.makao.game.validators.*;
 import tech.kucharski.makao.server.Client;
 import tech.kucharski.makao.server.ClientState;
 import tech.kucharski.makao.server.Message;
@@ -19,7 +25,7 @@ import java.util.*;
  * A game of Makao.
  */
 public class Game implements JSONConvertible {
-    private final Map<Card.CardType, CardSettings> cardSettings = new HashMap<>();
+    private final Map<CardType, CardSettings> cardSettings = new HashMap<>();
     private final List<CardValidator> cardValidators = Collections.synchronizedList(new ArrayList<>());
     private final Map<UUID, UUID> clientPlayerMap = Collections.synchronizedMap(new HashMap<>());
     private final UUID gameID;
@@ -37,7 +43,7 @@ public class Game implements JSONConvertible {
      */
     public Game(UUID gameID) {
         this.gameID = gameID;
-        for (Card.CardType type : Card.CardType.values())
+        for (CardType type : CardType.values())
             cardSettings.put(type, type.getDefaultSettings());
     }
 
@@ -224,9 +230,9 @@ public class Game implements JSONConvertible {
 
     /**
      * @param type Type of the {@link Card} that {@link CardSettings} should be returned for.
-     * @return {@link CardSettings} of {@link Card.CardType}.
+     * @return {@link CardSettings} of {@link CardType}.
      */
-    private CardSettings getCardSettings(@NotNull Card.CardType type) {
+    private CardSettings getCardSettings(@NotNull CardType type) {
         return cardSettings.getOrDefault(type, type.getDefaultSettings());
     }
 
@@ -253,12 +259,21 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * @param type Type of the card on top of the stack.
+     * @param type    Type of the card on top of the stack.
+     * @param request Requested color
+     * @throws IllegalArgumentException When request is invalid
      */
-    private void setStandardValidator(@NotNull Card.CardType type) {
+    private void setRequiredColorValidator(@NotNull CardType type, @Nullable String request) throws IllegalArgumentException {
+        if (request == null) setStandardValidator(type);
         cardValidators.clear();
-        cardValidators.add(new RequireColorValidator(type.getColor()));
-        cardValidators.add(new RequireValueValidator(type.getValue()));
+        cardValidators.add(new RequireColorValidator(CardColor.valueOf(request)));
+        cardSettings.forEach((type1, settings) -> {
+            if (settings.validatorPreset() == ValidatorPreset.REQUIRE_COLOR)
+                cardValidators.add(new CombinedValidator(
+                        new RequireValueValidator(type1.getValue()),
+                        new RequireColorValidator(type1.getColor())
+                ));
+        });
     }
 
     /**
@@ -270,21 +285,12 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * @param type    Type of the card on top of the stack.
-     * @param request Requested color
-     * @throws IllegalArgumentException When request is invalid
+     * @param type Type of the card on top of the stack.
      */
-    private void setRequiredColorValidator(@NotNull Card.CardType type, @Nullable String request) throws IllegalArgumentException {
-        if (request == null) setStandardValidator(type);
+    private void setStandardValidator(@NotNull CardType type) {
         cardValidators.clear();
-        cardValidators.add(new RequireColorValidator(Card.CardType.Color.valueOf(request)));
-        cardSettings.forEach((type1, settings) -> {
-            if (settings.validatorPreset() == ValidatorPreset.REQUIRE_COLOR)
-                cardValidators.add(new CombinedValidator(
-                        new RequireValueValidator(type1.getValue()),
-                        new RequireColorValidator(type1.getColor())
-                ));
-        });
+        cardValidators.add(new RequireColorValidator(type.getColor()));
+        cardValidators.add(new RequireValueValidator(type.getValue()));
     }
 
     /**
@@ -292,10 +298,10 @@ public class Game implements JSONConvertible {
      * @param request Requested value
      * @throws IllegalArgumentException When request is invalid
      */
-    private void setRequiredValueValidator(@NotNull Card.CardType type, @Nullable String request) throws IllegalArgumentException {
+    private void setRequiredValueValidator(@NotNull CardType type, @Nullable String request) throws IllegalArgumentException {
         if (request == null) setStandardValidator(type);
         cardValidators.clear();
-        cardValidators.add(new RequireValueValidator(Card.CardType.Value.valueOf(request)));
+        cardValidators.add(new RequireValueValidator(CardValue.valueOf(request)));
         cardSettings.forEach((type1, settings) -> {
             if (settings.validatorPreset() == ValidatorPreset.REQUIRE_VALUE)
                 cardValidators.add(new CombinedValidator(

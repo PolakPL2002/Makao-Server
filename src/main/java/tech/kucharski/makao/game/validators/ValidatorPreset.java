@@ -1,4 +1,4 @@
-package tech.kucharski.makao.game;
+package tech.kucharski.makao.game.validators;
 
 /**
  * Validator preset

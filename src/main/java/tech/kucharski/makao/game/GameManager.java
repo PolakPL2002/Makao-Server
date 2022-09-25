@@ -2,6 +2,7 @@ package tech.kucharski.makao.game;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import tech.kucharski.makao.game.exceptions.PlayerInGameException;
 import tech.kucharski.makao.server.Client;
 import tech.kucharski.makao.server.messages.GameAddedMessage;
 import tech.kucharski.makao.server.messages.GameRemovedMessage;
@@ -13,12 +14,12 @@ import java.util.*;
  */
 public class GameManager {
     private final Map<UUID, List<UUID>> clientPlayerMap = Collections.synchronizedMap(new HashMap<>());
+    private final Map<UUID, Game> games = Collections.synchronizedMap(new HashMap<>());
     /**
      * Map that maps player UUIDs to client UUIDs.
      */
     private final Map<UUID, UUID> playerClientMap = Collections.synchronizedMap(new HashMap<>());
     private final Map<UUID, Game> playerGameMap = Collections.synchronizedMap(new HashMap<>());
-    private final Map<UUID, Game> games = Collections.synchronizedMap(new HashMap<>());
     private final Set<UUID> usedPlayerIDs = Collections.synchronizedSet(new HashSet<>());
 
     /**
@@ -49,6 +50,7 @@ public class GameManager {
      * @return Newly created game
      * @throws PlayerInGameException A client is already in another game.
      */
+    @SuppressWarnings("UnusedReturnValue")
     public Game createGame(@NotNull UUID client) throws PlayerInGameException {
         if (games.values().stream().anyMatch(game -> game.getGameState() != GamePhase.FINISHED && game.hasClient(client)))
             throw new PlayerInGameException();
@@ -85,7 +87,14 @@ public class GameManager {
      * @return List of games of the client
      */
     public List<Game> getClientGames(UUID clientID) {
-        return clientPlayerMap.getOrDefault(clientID, new ArrayList<>()).stream().map(this::getGameByPlayerID).toList();
+        final List<UUID> players = clientPlayerMap.getOrDefault(clientID, new ArrayList<>());
+        final List<Game> clientGames = new ArrayList<>();
+        for (UUID player : players) {
+            final Game game = getGameByPlayerID(player);
+            if (game != null)
+                clientGames.add(game);
+        }
+        return clientGames;
     }
 
     /**
@@ -142,7 +151,7 @@ public class GameManager {
      * @param game Game to be removed.
      */
     public void removeGame(@NotNull Game game) {
-        games.remove(game);
+        games.remove(game.getGameID());
         new GameRemovedMessage(game).broadcast();
     }
 

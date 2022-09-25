@@ -1,4 +1,6 @@
-package tech.kucharski.makao.game;
+package tech.kucharski.makao.game.validators;
+
+import tech.kucharski.makao.game.deck.Card;
 
 /**
  * Validates if the card can be placed on top of the current card.

@@ -1,18 +1,20 @@
-package tech.kucharski.makao.game;
+package tech.kucharski.makao.game.validators;
 
 import org.jetbrains.annotations.NotNull;
+import tech.kucharski.makao.game.deck.Card;
+import tech.kucharski.makao.game.deck.CardValue;
 
 /**
  * Checks for required value.
  */
 public class RequireValueValidator implements CardValidator {
     @NotNull
-    private final Card.CardType.Value required;
+    private final CardValue required;
 
     /**
      * @param required Required value
      */
-    public RequireValueValidator(@NotNull Card.CardType.Value required) {
+    public RequireValueValidator(@NotNull CardValue required) {
         this.required = required;
     }
 

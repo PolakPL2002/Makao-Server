@@ -4,7 +4,7 @@ import com.google.gson.JsonObject;
 import org.java_websocket.WebSocket;
 import org.jetbrains.annotations.NotNull;
 import tech.kucharski.makao.Makao;
-import tech.kucharski.makao.game.PlayerInGameException;
+import tech.kucharski.makao.game.exceptions.PlayerInGameException;
 import tech.kucharski.makao.server.InvalidRequestException;
 import tech.kucharski.makao.server.Request;
 

@@ -1,18 +1,20 @@
-package tech.kucharski.makao.game;
+package tech.kucharski.makao.game.validators;
 
 import org.jetbrains.annotations.NotNull;
+import tech.kucharski.makao.game.deck.Card;
+import tech.kucharski.makao.game.deck.CardColor;
 
 /**
  * Checks for the required color.
  */
 public class RequireColorValidator implements CardValidator {
     @NotNull
-    private final Card.CardType.Color required;
+    private final CardColor required;
 
     /**
      * @param required Required color.
      */
-    public RequireColorValidator(@NotNull Card.CardType.Color required) {
+    public RequireColorValidator(@NotNull CardColor required) {
         this.required = required;
     }
 
