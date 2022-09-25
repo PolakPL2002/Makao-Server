@@ -19,13 +19,14 @@ import java.util.*;
  * A game of Makao.
  */
 public class Game implements JSONConvertible {
+    private final Map<Card.CardType, CardSettings> cardSettings = new HashMap<>();
     private final List<CardValidator> cardValidators = Collections.synchronizedList(new ArrayList<>());
+    private final Map<UUID, UUID> clientPlayerMap = Collections.synchronizedMap(new HashMap<>());
     private final UUID gameID;
     private final List<Player> players = Collections.synchronizedList(new ArrayList<>());
     private final TurnManager turnManager = new TurnManager();
     private Deck deck = null;
     private boolean drawnCard = false;
-    private final Map<UUID, UUID> clientPlayerMap = Collections.synchronizedMap(new HashMap<>());
     /**
      * State of the game.
      */
@@ -36,6 +37,8 @@ public class Game implements JSONConvertible {
      */
     public Game(UUID gameID) {
         this.gameID = gameID;
+        for (Card.CardType type : Card.CardType.values())
+            cardSettings.put(type, type.getDefaultSettings());
     }
 
     /**
@@ -45,6 +48,7 @@ public class Game implements JSONConvertible {
      * @return A newly added player.
      * @throws IllegalStateException When the method is called in the wrong game phase.
      */
+    @SuppressWarnings("UnusedReturnValue")
     public Player addPlayer(@NotNull UUID clientID) throws IllegalStateException {
         if (getGameState() != GamePhase.PREPARING)
             throw new IllegalStateException("A player can only be added in preparing phase of the game.");
@@ -65,38 +69,6 @@ public class Game implements JSONConvertible {
      */
     public GamePhase getGameState() {
         return gamePhase;
-    }
-
-    /**
-     * @param clientID Client ID
-     * @return Player ID
-     */
-    @Nullable
-    public UUID getPlayerID(UUID clientID) {
-        return clientPlayerMap.get(clientID);
-    }
-
-    /**
-     * @param uuid Player to be removed
-     * @throws IllegalStateException When game is in incorrect phase.
-     */
-    public void removePlayer(@NotNull UUID uuid) throws IllegalStateException {
-        if (getGameState() != GamePhase.PREPARING && getGameState() != GamePhase.IN_GAME)
-            throw new IllegalStateException(String.format("A player cannot be removed in %s phase of the game.", getGameState()));
-
-        final Player player = getPlayer(uuid);
-        if (player == null) return;
-
-        players.remove(player);
-        if (deck != null)
-            deck.removePlayer(player.getUUID());
-        Makao.getInstance().getGameManager().removePlayer(uuid);
-        sendAll(new PlayerLeftMessage(this, player));
-        if (getGameState() == GamePhase.PREPARING)
-            new GameUpdatedMessage(this).broadcast();
-        if (players.size() == 0) {
-            Makao.getInstance().getGameManager().removeGame(this);
-        }
     }
 
     /**
@@ -160,34 +132,21 @@ public class Game implements JSONConvertible {
     }
 
     /**
+     * @param clientID Client ID
+     * @return Player ID
+     */
+    @Nullable
+    public UUID getPlayerID(UUID clientID) {
+        return clientPlayerMap.get(clientID);
+    }
+
+    /**
      * @param playerID Player ID
      * @return A player if found
      */
     @Nullable
     private Player getPlayer(UUID playerID) {
         return players.stream().filter(player -> player.getUUID().equals(playerID)).findFirst().orElse(null);
-    }
-
-    /**
-     * @throws IllegalStateException When game is in incorrect state.
-     */
-    public void startGame() throws IllegalStateException {
-        if (getGameState() != GamePhase.PREPARING)
-            throw new IllegalStateException("A game can only be started in preparing phase of the game.");
-
-        setGamePhase(GamePhase.IN_GAME);
-
-        new GameRemovedMessage(this).broadcast();
-
-        deck = new Deck((players.size() - 1) / 4 + 1);
-        sendUpdate();
-        players.forEach(player -> {
-            deck.givePlayerCards(player.getUUID(), 20);
-            sendUpdatedCardsToPlayer(player);
-        });
-        cardValidators.add(new SameColorValidator(deck.getCurrentTopCard()));
-        cardValidators.add(new SameValueValidator(deck.getCurrentTopCard()));
-        nextTurn();
     }
 
     /**
@@ -242,9 +201,33 @@ public class Game implements JSONConvertible {
         if (!turnManager.getCurrentPlayer().equals(playerID))
             throw new WrongTurnException();
         deck.playCard(card);
+        //TODO Handle ILE
+        switch (getCardSettings(
+                card.getType()).validatorPreset()) {
+            case STANDARD -> setStandardValidator(card.getType());
+            case REQUIRE_COLOR -> setRequiredColorValidator(card.getType(), request);
+            case REQUIRE_VALUE -> setRequiredValueValidator(card.getType(), request);
+            default -> setAcceptAllValidator();
+        }
         sendAll(new DeckUpdatedMessage(this));
         sendUpdatedCardsToPlayer(player);
         nextTurn();
+    }
+
+    /**
+     * @param player Player the cards should be sent to.
+     */
+    private void sendUpdatedCardsToPlayer(@NotNull Player player) {
+        if (deck == null) return;
+        send(player, new SelfCardsUpdatedMessage(this, deck.getPlayerCardUUIDs(player.getUUID())));
+    }
+
+    /**
+     * @param type Type of the {@link Card} that {@link CardSettings} should be returned for.
+     * @return {@link CardSettings} of {@link Card.CardType}.
+     */
+    private CardSettings getCardSettings(@NotNull Card.CardType type) {
+        return cardSettings.getOrDefault(type, type.getDefaultSettings());
     }
 
     /**
@@ -270,22 +253,102 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * @param player Player the cards should be sent to.
+     * @param type Type of the card on top of the stack.
      */
-    private void sendUpdatedCardsToPlayer(@NotNull Player player) {
-        if (deck == null) return;
-        send(player, new SelfCardsUpdatedMessage(this, deck.getPlayerCards(player.getUUID())));
+    private void setStandardValidator(@NotNull Card.CardType type) {
+        cardValidators.clear();
+        cardValidators.add(new RequireColorValidator(type.getColor()));
+        cardValidators.add(new RequireValueValidator(type.getValue()));
     }
 
     /**
-     * @param playerID Player to be updated
+     * Sets validators to accept everything.
      */
-    public void updatePlayer(UUID playerID) {
-        final Player player = getPlayer(playerID);
+    private void setAcceptAllValidator() {
+        cardValidators.clear();
+        cardValidators.add(new AcceptAllValidator());
+    }
+
+    /**
+     * @param type    Type of the card on top of the stack.
+     * @param request Requested color
+     * @throws IllegalArgumentException When request is invalid
+     */
+    private void setRequiredColorValidator(@NotNull Card.CardType type, @Nullable String request) throws IllegalArgumentException {
+        if (request == null) setStandardValidator(type);
+        cardValidators.clear();
+        cardValidators.add(new RequireColorValidator(Card.CardType.Color.valueOf(request)));
+        cardSettings.forEach((type1, settings) -> {
+            if (settings.validatorPreset() == ValidatorPreset.REQUIRE_COLOR)
+                cardValidators.add(new CombinedValidator(
+                        new RequireValueValidator(type1.getValue()),
+                        new RequireColorValidator(type1.getColor())
+                ));
+        });
+    }
+
+    /**
+     * @param type    Type of the card on top of the stack.
+     * @param request Requested value
+     * @throws IllegalArgumentException When request is invalid
+     */
+    private void setRequiredValueValidator(@NotNull Card.CardType type, @Nullable String request) throws IllegalArgumentException {
+        if (request == null) setStandardValidator(type);
+        cardValidators.clear();
+        cardValidators.add(new RequireValueValidator(Card.CardType.Value.valueOf(request)));
+        cardSettings.forEach((type1, settings) -> {
+            if (settings.validatorPreset() == ValidatorPreset.REQUIRE_VALUE)
+                cardValidators.add(new CombinedValidator(
+                        new RequireValueValidator(type1.getValue()),
+                        new RequireColorValidator(type1.getColor())
+                ));
+        });
+    }
+
+    /**
+     * @param uuid Player to be removed
+     * @throws IllegalStateException When game is in incorrect phase.
+     */
+    public void removePlayer(@NotNull UUID uuid) throws IllegalStateException {
+        if (getGameState() != GamePhase.PREPARING && getGameState() != GamePhase.IN_GAME)
+            throw new IllegalStateException(String.format("A player cannot be removed in %s phase of the game.", getGameState()));
+
+        final Player player = getPlayer(uuid);
         if (player == null) return;
 
-        sendUpdate(player);
-        sendUpdatedCardsToPlayer(player);
+        players.remove(player);
+        if (deck != null)
+            deck.removePlayer(player.getUUID());
+        Makao.getInstance().getGameManager().removePlayer(uuid);
+        sendAll(new PlayerLeftMessage(this, player));
+        if (getGameState() == GamePhase.PREPARING)
+            new GameUpdatedMessage(this).broadcast();
+        if (players.size() == 0) {
+            Makao.getInstance().getGameManager().removeGame(this);
+        }
+    }
+
+    /**
+     * @throws IllegalStateException When game is in incorrect state.
+     */
+    public void startGame() throws IllegalStateException {
+        if (getGameState() != GamePhase.PREPARING)
+            throw new IllegalStateException("A game can only be started in preparing phase of the game.");
+
+        setGamePhase(GamePhase.IN_GAME);
+
+        new GameRemovedMessage(this).broadcast();
+
+        turnManager.setRandom();
+        deck = new Deck(((players.size() - 1) / 4 + 1) * 3, cardSettings);
+        sendUpdate();
+        players.forEach(player -> {
+            deck.givePlayerCards(player.getUUID(), 60);
+            sendUpdatedCardsToPlayer(player);
+        });
+        //Deck starting card must be normal or at very least treated as such.
+        setStandardValidator(deck.getCurrentTopCard().getType());
+        nextTurn();
     }
 
     /**
@@ -325,6 +388,16 @@ public class Game implements JSONConvertible {
     }
 
     /**
+     * Sets a game phase.
+     *
+     * @param gamePhase New game phase.
+     */
+    private void setGamePhase(@SuppressWarnings("SameParameterValue") GamePhase gamePhase) {
+        this.gamePhase = gamePhase;
+        sendUpdate();
+    }
+
+    /**
      * Sends full update to all players.
      */
     private void sendUpdate() {
@@ -332,12 +405,13 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * Sets a game phase.
-     *
-     * @param gamePhase New game phase.
+     * @param playerID Player to be updated
      */
-    private void setGamePhase(GamePhase gamePhase) {
-        this.gamePhase = gamePhase;
-        sendUpdate();
+    public void updatePlayer(UUID playerID) {
+        final Player player = getPlayer(playerID);
+        if (player == null) return;
+
+        sendUpdate(player);
+        sendUpdatedCardsToPlayer(player);
     }
 }

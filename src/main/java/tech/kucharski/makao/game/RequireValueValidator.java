@@ -18,6 +18,6 @@ public class RequireValueValidator implements CardValidator {
 
     @Override
     public boolean validate(@NotNull Card card) {
-        return required == card.getType().getValue() || card.getType().getValue() == Card.CardType.Value.CARD_JACK;
+        return required == card.getType().getValue();
     }
 }

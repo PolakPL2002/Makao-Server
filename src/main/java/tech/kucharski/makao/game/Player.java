@@ -40,7 +40,7 @@ public class Player implements JSONConvertible {
         if (game != null) {
             final Deck deck = game.getDeck();
             if (deck != null) {
-                final List<UUID> cards = deck.getPlayerCards(uuid);
+                final List<UUID> cards = deck.getPlayerCardUUIDs(uuid);
                 obj.addProperty("cardsRemaining", cards.size());
             } else {
                 obj.addProperty("cardsRemaining", 0);

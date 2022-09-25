@@ -13,6 +13,7 @@ import java.util.*;
  * Deck of cards
  */
 public class Deck implements JSONConvertible {
+    private final Map<Card.CardType, CardSettings> cardSettings;
     private final List<Card> cards = Collections.synchronizedList(new ArrayList<>());
     private final List<UUID> discardedCards = Collections.synchronizedList(new ArrayList<>());
     private final Map<UUID, List<UUID>> playersCards = Collections.synchronizedMap(new HashMap<>());
@@ -20,8 +21,10 @@ public class Deck implements JSONConvertible {
 
     /**
      * @param numberOfDecks Number of decks of cards to use
+     * @param cardSettings  Card settings to be used with the deck
      */
-    public Deck(int numberOfDecks) {
+    public Deck(int numberOfDecks, Map<Card.CardType, CardSettings> cardSettings) {
+        this.cardSettings = cardSettings;
         if (numberOfDecks < 1) numberOfDecks = 1;
 
         for (int i = 0; i < numberOfDecks; i++) {
@@ -37,29 +40,10 @@ public class Deck implements JSONConvertible {
         Collections.shuffle(remainingCards);
 
         discardedCards.add(remainingCards.remove(0));
-        while (!isNormal(discardedCards.get(discardedCards.size() - 1))) {
+        while (!getCardSettings(Objects.requireNonNull(getCardByUUID(discardedCards.get(discardedCards.size() - 1)))
+                .getType()).canBeStartCard()) {
             discardedCards.add(remainingCards.remove(0));
         }
-    }
-
-    /**
-     * @param cardUUID Card UUID
-     * @return Whether card is not special
-     */
-    public boolean isNormal(@NotNull UUID cardUUID) {
-        final Card.CardType type = Objects.requireNonNull(getCardByUUID(cardUUID)).getType();
-        final Card.CardType.Value value = type.getValue();
-        final Card.CardType.Color color = type.getColor();
-        return value == Card.CardType.Value.CARD_0 ||
-                value == Card.CardType.Value.CARD_1 ||
-                value == Card.CardType.Value.CARD_5 ||
-                value == Card.CardType.Value.CARD_6 ||
-                value == Card.CardType.Value.CARD_7 ||
-                value == Card.CardType.Value.CARD_8 ||
-                value == Card.CardType.Value.CARD_9 ||
-                value == Card.CardType.Value.CARD_10 ||
-                value == Card.CardType.Value.CARD_11 ||
-                (value == Card.CardType.Value.CARD_KING && (color == Card.CardType.Color.CLUBS || color == Card.CardType.Color.DIAMONDS));
     }
 
     /**
@@ -87,8 +71,17 @@ public class Deck implements JSONConvertible {
     }
 
     /**
+     * @param type Type of the {@link Card} that {@link CardSettings} should be returned for.
+     * @return {@link CardSettings} of {@link Card.CardType}.
+     */
+    private CardSettings getCardSettings(@NotNull Card.CardType type) {
+        return cardSettings.getOrDefault(type, type.getDefaultSettings());
+    }
+
+    /**
      * @return All deck cards
      */
+    @SuppressWarnings("unused")
     @NotNull
     public Card[] getCards() {
         return cards.toArray(new Card[0]);
@@ -159,13 +152,31 @@ public class Deck implements JSONConvertible {
      * @param color  Card color
      * @return Whether player has a card of this color
      */
+    @SuppressWarnings("unused")
     public boolean playerHasCard(@NotNull UUID player, @NotNull Card.CardType.Color color) {
-        checkPlayerExists(player);
-        final List<UUID> playerCards = getPlayerCards(player);
-        for (Card card : playerCards.stream().map(this::getCardByUUID).toList())
+        final List<Card> playerCards = getPlayerCards(player);
+        for (Card card : playerCards)
             if (card.getType().getColor() == color)
                 return true;
         return false;
+    }
+
+    /**
+     * @param uuid UUID of the player.
+     * @return Cards of the player.
+     */
+    @NotNull
+    private List<Card> getPlayerCards(@NotNull UUID uuid) {
+        checkPlayerExists(uuid);
+        final List<UUID> playerCardsIDs = getPlayerCardUUIDs(uuid);
+        final List<Card> playerCards = new ArrayList<>();
+        for (UUID cardUUID : playerCardsIDs) {
+            final Card card = getCardByUUID(cardUUID);
+            if (card != null) {
+                playerCards.add(card);
+            }
+        }
+        return playerCards;
     }
 
     /**
@@ -173,7 +184,7 @@ public class Deck implements JSONConvertible {
      * @return Player cards
      */
     @NotNull
-    public List<UUID> getPlayerCards(@NotNull UUID uuid) {
+    public List<UUID> getPlayerCardUUIDs(@NotNull UUID uuid) {
         checkPlayerExists(uuid);
 
         return new ArrayList<>(playersCards.get(uuid));
@@ -184,10 +195,10 @@ public class Deck implements JSONConvertible {
      * @param value  Card value
      * @return Whether player has a card of this value
      */
+    @SuppressWarnings("unused")
     public boolean playerHasCard(@NotNull UUID player, @NotNull Card.CardType.Value value) {
-        checkPlayerExists(player);
-        final List<UUID> playerCards = getPlayerCards(player);
-        for (Card card : playerCards.stream().map(this::getCardByUUID).toList())
+        final List<Card> playerCards = getPlayerCards(player);
+        for (Card card : playerCards)
             if (card.getType().getValue() == value)
                 return true;
         return false;
@@ -199,10 +210,10 @@ public class Deck implements JSONConvertible {
      * @param value  Card value
      * @return Whether player has a card of this color and value
      */
+    @SuppressWarnings("unused")
     public boolean playerHasCard(@NotNull UUID player, @NotNull Card.CardType.Color color, @NotNull Card.CardType.Value value) {
-        checkPlayerExists(player);
-        final List<UUID> playerCards = getPlayerCards(player);
-        for (Card card : playerCards.stream().map(this::getCardByUUID).toList())
+        final List<Card> playerCards = getPlayerCards(player);
+        for (Card card : playerCards)
             if (card.getType().getColor() == color && card.getType().getValue() == value)
                 return true;
         return false;
@@ -251,6 +262,7 @@ public class Deck implements JSONConvertible {
     /**
      * @return Number of cards in unused pile
      */
+    @SuppressWarnings("unused")
     public int unusedCount() {
         return remainingCards.size();
     }
@@ -258,6 +270,7 @@ public class Deck implements JSONConvertible {
     /**
      * @return Number of cards in used pile
      */
+    @SuppressWarnings("unused")
     public int usedCount() {
         return discardedCards.size();
     }

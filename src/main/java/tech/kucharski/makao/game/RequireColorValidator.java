@@ -18,6 +18,6 @@ public class RequireColorValidator implements CardValidator {
 
     @Override
     public boolean validate(@NotNull Card card) {
-        return required == card.getType().getColor() || card.getType().getValue() == Card.CardType.Value.CARD_ACE;
+        return required == card.getType().getColor();
     }
 }

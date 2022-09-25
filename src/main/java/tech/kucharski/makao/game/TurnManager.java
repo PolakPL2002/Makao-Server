@@ -31,21 +31,11 @@ public class TurnManager {
     }
 
     /**
-     * Updates the player
-     */
-    public void nextTurn() {
-        if (turnOf == null) {
-            turnOf = players.get((int) (Math.random() * players.size()));
-        } else {
-            turnOf = players.get((players.indexOf(turnOf) + 1) % players.size());
-        }
-    }
-
-    /**
      * Updates the player and returns the id
      *
      * @return ID of the player
      */
+    @SuppressWarnings("unused")
     @NotNull
     public UUID getNextPlayer() {
         nextTurn();
@@ -53,8 +43,27 @@ public class TurnManager {
     }
 
     /**
+     * Updates the player
+     */
+    public void nextTurn() {
+        if (turnOf == null) {
+            turnOf = players.get((int) (Math.random() * players.size()));
+        } else {
+            setRandom();
+        }
+    }
+
+    /**
+     * Sets the random player.
+     */
+    public void setRandom() {
+        turnOf = players.get((players.indexOf(turnOf) + 1) % players.size());
+    }
+
+    /**
      * @param uuid ID to remove
      */
+    @SuppressWarnings("unused")
     public void removePlayer(UUID uuid) {
         if (turnOf != null && turnOf.equals(uuid)) {
             nextTurn();
