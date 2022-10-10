@@ -75,7 +75,6 @@ public enum Requests {
      * Handles the request.
      *
      * @param jsonObject Request data.
-     * @param server     Server that should handle the request.
      * @param socket     Socket that sent the request.
      * @throws NoSuchMethodException     When request is invalid
      * @throws InvocationTargetException When request is invalid
@@ -83,7 +82,7 @@ public enum Requests {
      * @throws IllegalAccessException    When request is invalid
      * @throws InvalidRequestException   When request is invalid
      */
-    public void handle(JsonObject jsonObject, @NotNull Server server, @NotNull WebSocket socket)
+    public void handle(JsonObject jsonObject, @NotNull WebSocket socket)
             throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException,
             InvalidRequestException {
         final Constructor<? extends Request> constructor = getClazz().getDeclaredConstructor(JsonObject.class);
