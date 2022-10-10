@@ -138,21 +138,21 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * @param clientID Client ID
-     * @return Player ID
-     */
-    @Nullable
-    public UUID getPlayerID(UUID clientID) {
-        return clientPlayerMap.get(clientID);
-    }
-
-    /**
      * @param playerID Player ID
      * @return A player if found
      */
     @Nullable
     private Player getPlayer(UUID playerID) {
         return players.stream().filter(player -> player.getUUID().equals(playerID)).findFirst().orElse(null);
+    }
+
+    /**
+     * @param clientID Client ID
+     * @return Player ID
+     */
+    @Nullable
+    public UUID getPlayerID(UUID clientID) {
+        return clientPlayerMap.get(clientID);
     }
 
     /**
@@ -171,6 +171,52 @@ public class Game implements JSONConvertible {
     }
 
     /**
+     * @param playerID Player playing a card.
+     * @param cards    A card being played.
+     * @param request  Requested value (for supported cards)
+     * @throws PlayerNotFoundException  Player wasn't found.
+     * @throws CardNotFoundException    Card wasn't found.
+     * @throws InvalidCardException     Card cannot be played right now.
+     * @throws WrongTurnException       It's not player's turn.
+     * @throws IllegalArgumentException If request is null when it is required.
+     */
+    public void playCard(@NotNull UUID playerID, @NotNull List<UUID> cards, @Nullable String request) throws PlayerNotFoundException,
+            CardNotFoundException, InvalidCardException, WrongTurnException, IllegalArgumentException {
+        final Player player = getPlayer(playerID);
+        if (player == null)
+            throw new PlayerNotFoundException();
+        if (!turnManager.getCurrentPlayer().equals(playerID))
+            throw new WrongTurnException();
+        Card lastCard = null;
+        for (UUID card : cards) {
+            final Card c = deck.getCardByUUID(card);
+            if (c == null)
+                throw new CardNotFoundException();
+            if (lastCard == null && !validateCard(c))
+                throw new InvalidCardException();
+            if (lastCard != null && lastCard.getType().getValue() != c.getType().getValue())
+                throw new InvalidCardException();
+            deck.playCard(c);
+            lastCard = c;
+        }
+        if (lastCard == null)
+            throw new InvalidCardException();
+        final ValidatorPreset preset = getCardSettings(lastCard.getType()).validatorPreset();
+        if ((preset == ValidatorPreset.REQUIRE_COLOR || preset == ValidatorPreset.REQUIRE_VALUE) && request == null) {
+            throw new IllegalArgumentException();
+        }
+        switch (preset) {
+            case STANDARD -> setStandardValidator(lastCard.getType());
+            case REQUIRE_COLOR -> setRequiredColorValidator(lastCard.getType(), request);
+            case REQUIRE_VALUE -> setRequiredValueValidator(lastCard.getType(), request);
+            default -> setAcceptAllValidator();
+        }
+        sendAll(new DeckUpdatedMessage(this));
+        sendUpdatedCardsToPlayer(player);
+        nextTurn();
+    }
+
+    /**
      * @return Current player ID.
      */
     public UUID getTurn() {
@@ -183,41 +229,6 @@ public class Game implements JSONConvertible {
      */
     public boolean hasClient(@NotNull UUID clientID) {
         return players.stream().anyMatch(player -> clientID.equals(Makao.getInstance().getGameManager().getClientID(player.getUUID())));
-    }
-
-    /**
-     * @param playerID Player playing a card.
-     * @param cardID   A card being played.
-     * @param request  Requested value (for supported cards)
-     * @throws PlayerNotFoundException Player wasn't found.
-     * @throws CardNotFoundException   Card wasn't found.
-     * @throws InvalidCardException    Card cannot be played right now.
-     * @throws WrongTurnException      It's not player's turn.
-     */
-    public void playCard(@NotNull UUID playerID, @NotNull UUID cardID, @Nullable String request) throws PlayerNotFoundException,
-            CardNotFoundException, InvalidCardException, WrongTurnException {
-        final Player player = getPlayer(playerID);
-        if (player == null)
-            throw new PlayerNotFoundException();
-        final Card card = deck.getCardByUUID(cardID);
-        if (card == null)
-            throw new CardNotFoundException();
-        if (!validateCard(card))
-            throw new InvalidCardException();
-        if (!turnManager.getCurrentPlayer().equals(playerID))
-            throw new WrongTurnException();
-        deck.playCard(card);
-        //TODO Handle ILE
-        switch (getCardSettings(
-                card.getType()).validatorPreset()) {
-            case STANDARD -> setStandardValidator(card.getType());
-            case REQUIRE_COLOR -> setRequiredColorValidator(card.getType(), request);
-            case REQUIRE_VALUE -> setRequiredValueValidator(card.getType(), request);
-            default -> setAcceptAllValidator();
-        }
-        sendAll(new DeckUpdatedMessage(this));
-        sendUpdatedCardsToPlayer(player);
-        nextTurn();
     }
 
     /**
@@ -264,7 +275,10 @@ public class Game implements JSONConvertible {
      * @throws IllegalArgumentException When request is invalid
      */
     private void setRequiredColorValidator(@NotNull CardType type, @Nullable String request) throws IllegalArgumentException {
-        if (request == null) setStandardValidator(type);
+        if (request == null) {
+            setStandardValidator(type);
+            return;
+        }
         cardValidators.clear();
         cardValidators.add(new RequireColorValidator(CardColor.valueOf(request)));
         cardSettings.forEach((type1, settings) -> {
@@ -299,7 +313,10 @@ public class Game implements JSONConvertible {
      * @throws IllegalArgumentException When request is invalid
      */
     private void setRequiredValueValidator(@NotNull CardType type, @Nullable String request) throws IllegalArgumentException {
-        if (request == null) setStandardValidator(type);
+        if (request == null) {
+            setStandardValidator(type);
+            return;
+        }
         cardValidators.clear();
         cardValidators.add(new RequireValueValidator(CardValue.valueOf(request)));
         cardSettings.forEach((type1, settings) -> {
@@ -346,10 +363,10 @@ public class Game implements JSONConvertible {
         new GameRemovedMessage(this).broadcast();
 
         turnManager.setRandom();
-        deck = new Deck(((players.size() - 1) / 4 + 1) * 3, cardSettings);
+        deck = new Deck((players.size() - 1) / 4 + 1, cardSettings);
         sendUpdate();
         players.forEach(player -> {
-            deck.givePlayerCards(player.getUUID(), 60);
+            deck.givePlayerCards(player.getUUID(), 5);
             sendUpdatedCardsToPlayer(player);
         });
         //Deck starting card must be normal or at very least treated as such.
@@ -394,13 +411,14 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * Sets a game phase.
-     *
-     * @param gamePhase New game phase.
+     * @param playerID Player to be updated
      */
-    private void setGamePhase(@SuppressWarnings("SameParameterValue") GamePhase gamePhase) {
-        this.gamePhase = gamePhase;
-        sendUpdate();
+    public void updatePlayer(UUID playerID) {
+        final Player player = getPlayer(playerID);
+        if (player == null) return;
+
+        sendUpdate(player);
+        sendUpdatedCardsToPlayer(player);
     }
 
     /**
@@ -411,13 +429,12 @@ public class Game implements JSONConvertible {
     }
 
     /**
-     * @param playerID Player to be updated
+     * Sets a game phase.
+     *
+     * @param gamePhase New game phase.
      */
-    public void updatePlayer(UUID playerID) {
-        final Player player = getPlayer(playerID);
-        if (player == null) return;
-
-        sendUpdate(player);
-        sendUpdatedCardsToPlayer(player);
+    private void setGamePhase(@SuppressWarnings("SameParameterValue") GamePhase gamePhase) {
+        this.gamePhase = gamePhase;
+        sendUpdate();
     }
 }

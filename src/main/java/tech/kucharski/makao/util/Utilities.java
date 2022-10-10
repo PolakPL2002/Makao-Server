@@ -250,5 +250,18 @@ public class Utilities {
                 return false;
         return true;
     }
+
+    /**
+     * @param message Message to validate
+     * @param keys    Keys to validate
+     * @return Whether message contains all keys and they are arrays
+     */
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public static boolean validateArrays(@NotNull JsonObject message, @NotNull String[] keys) {
+        for (String key : keys)
+            if (!message.has(key) || !message.get(key).isJsonArray())
+                return false;
+        return true;
+    }
 }
 
