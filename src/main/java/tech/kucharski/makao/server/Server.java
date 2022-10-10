@@ -123,7 +123,7 @@ public class Server extends WebSocketServer {
             return;
         }
         try {
-            request.handle(jsonObject, this, conn);
+            request.handle(jsonObject, conn);
         } catch (NoSuchMethodException | InvocationTargetException | InstantiationException |
                  IllegalAccessException e) {
             warning("[Server] Failed to handle request.");
