@@ -1,4 +1,4 @@
-package tech.kucharski.makao.server.messages;
+package tech.kucharski.makao.server.messages.responses;
 
 import com.google.gson.JsonObject;
 import tech.kucharski.makao.server.Message;
@@ -7,7 +7,7 @@ import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
- * Response with error code
+ * Empty response
  */
 public class AckResponse implements Message {
     @Nullable

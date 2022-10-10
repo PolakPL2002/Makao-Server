@@ -8,8 +8,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface Request {
     /**
-     * @param server Server that should handle the request.
      * @param socket Socket that sent the request.
      */
-    void handle(@NotNull Server server, @NotNull WebSocket socket);
+    void handle(@NotNull WebSocket socket);
 }

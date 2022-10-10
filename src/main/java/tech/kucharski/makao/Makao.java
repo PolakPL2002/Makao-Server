@@ -1,6 +1,7 @@
 package tech.kucharski.makao;
 
 import org.jetbrains.annotations.NotNull;
+import tech.kucharski.makao.game.GameManager;
 import tech.kucharski.makao.server.Server;
 
 import java.io.IOException;
@@ -14,6 +15,7 @@ import static tech.kucharski.makao.util.Logger.*;
  */
 public class Makao {
     private static Makao instance = null;
+    private final GameManager gameManager;
     private final Server server;
 
     /**
@@ -50,9 +52,18 @@ public class Makao {
 
         log("[Makao] Initializing game manager...");
 
+        gameManager = new GameManager();
+
         log("[Makao] Starting server...");
         server = new Server(new InetSocketAddress(IP, numericPort));
         server.start();
+    }
+
+    /**
+     * @return A game manager.
+     */
+    public GameManager getGameManager() {
+        return gameManager;
     }
 
     /**

@@ -3,9 +3,9 @@ package tech.kucharski.makao.server.requests;
 import com.google.gson.JsonObject;
 import org.java_websocket.WebSocket;
 import org.jetbrains.annotations.NotNull;
+import tech.kucharski.makao.Makao;
 import tech.kucharski.makao.server.Client;
 import tech.kucharski.makao.server.Request;
-import tech.kucharski.makao.server.Server;
 
 import java.util.UUID;
 
@@ -20,8 +20,8 @@ public class HeartbeatRequest implements Request {
     }
 
     @Override
-    public void handle(@NotNull Server server, @NotNull WebSocket socket) {
-        final Client client = server.getClient(socket.<UUID>getAttachment());
+    public void handle(@NotNull WebSocket socket) {
+        final Client client = Makao.getInstance().getServer().getClient(socket.<UUID>getAttachment());
         if (client != null) {
             client.heartbeatReceived();
         }
