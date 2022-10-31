@@ -7,11 +7,11 @@ import tech.kucharski.makao.Makao;
 import tech.kucharski.makao.game.exceptions.PlayerInGameException;
 import tech.kucharski.makao.server.InvalidRequestException;
 import tech.kucharski.makao.server.Request;
+import tech.kucharski.makao.util.MessageValidator;
 
 import java.util.UUID;
 
 import static tech.kucharski.makao.server.messages.responses.ErrorResponse.FORBIDDEN;
-import static tech.kucharski.makao.util.Utilities.validatePrimitives;
 
 /**
  * Creates a new game.
@@ -24,7 +24,9 @@ public class CreateGameRequest implements Request {
      * @throws InvalidRequestException When data is invalid.
      */
     public CreateGameRequest(JsonObject jsonObject) throws InvalidRequestException {
-        if (!validatePrimitives(jsonObject, new String[]{"uuid"}))
+        if (!new MessageValidator()
+                .requirePrimitive("uuid", false)
+                .validate(jsonObject))
             throw new InvalidRequestException();
         try {
             this.reqID = UUID.fromString(jsonObject.get("uuid").getAsJsonPrimitive().getAsString());

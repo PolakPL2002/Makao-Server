@@ -1,7 +1,6 @@
 package tech.kucharski.makao.util;
 
 import com.google.common.io.ByteStreams;
-import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -214,54 +213,20 @@ public class Utilities {
      */
     @NotNull
     public static Map<String, String> splitQuery(@NotNull URI url) {
-        Map<String, String> query_pairs = new LinkedHashMap<>();
+        Map<String, String> queryPairs = new LinkedHashMap<>();
         String query = url.getQuery();
-        if (query == null) return query_pairs;
+        if (query == null) return queryPairs;
         String[] pairs = query.split("&");
         for (String pair : pairs) {
             int idx = pair.indexOf("=");
-            query_pairs.put(URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8), URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8));
+            if (idx == -1) {
+                queryPairs.put(URLDecoder.decode(pair, StandardCharsets.UTF_8), "");
+            } else {
+                queryPairs.put(URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8),
+                        URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8));
+            }
         }
-        return query_pairs;
-    }
-
-    /**
-     * @param message Message to validate
-     * @param keys    Keys to validate
-     * @return Whether message contains all keys and they are primitives
-     */
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    public static boolean validatePrimitiveOrNull(@NotNull JsonObject message, @NotNull String[] keys) {
-        for (String key : keys)
-            if (!message.has(key) || !(message.get(key).isJsonPrimitive() || message.get(key).isJsonNull()))
-                return false;
-        return true;
-    }
-
-    /**
-     * @param message Message to validate
-     * @param keys    Keys to validate
-     * @return Whether message contains all keys and they are primitives
-     */
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    public static boolean validatePrimitives(@NotNull JsonObject message, @NotNull String[] keys) {
-        for (String key : keys)
-            if (!message.has(key) || !message.get(key).isJsonPrimitive())
-                return false;
-        return true;
-    }
-
-    /**
-     * @param message Message to validate
-     * @param keys    Keys to validate
-     * @return Whether message contains all keys and they are arrays
-     */
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    public static boolean validateArrays(@NotNull JsonObject message, @NotNull String[] keys) {
-        for (String key : keys)
-            if (!message.has(key) || !message.get(key).isJsonArray())
-                return false;
-        return true;
+        return queryPairs;
     }
 }
 

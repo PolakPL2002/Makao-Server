@@ -10,10 +10,9 @@ import tech.kucharski.makao.server.InvalidRequestException;
 import tech.kucharski.makao.server.Request;
 import tech.kucharski.makao.server.messages.ClientInfoMessage;
 import tech.kucharski.makao.server.messages.GameUpdatedMessage;
+import tech.kucharski.makao.util.MessageValidator;
 
 import java.util.UUID;
-
-import static tech.kucharski.makao.util.Utilities.validatePrimitives;
 
 /**
  * Asks the server to change the name of the user.
@@ -27,7 +26,10 @@ public class ChangeNameRequest implements Request {
      * @throws InvalidRequestException When data is invalid.
      */
     public ChangeNameRequest(JsonObject jsonObject) throws InvalidRequestException {
-        if (!validatePrimitives(jsonObject, new String[]{"name", "uuid"}))
+        if (!new MessageValidator()
+                .requirePrimitive("name", false)
+                .requirePrimitive("uuid", false)
+                .validate(jsonObject))
             throw new InvalidRequestException();
         try {
             this.name = jsonObject.get("name").getAsJsonPrimitive().getAsString();

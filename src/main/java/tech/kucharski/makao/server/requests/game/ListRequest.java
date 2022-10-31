@@ -7,10 +7,9 @@ import tech.kucharski.makao.Makao;
 import tech.kucharski.makao.server.InvalidRequestException;
 import tech.kucharski.makao.server.Request;
 import tech.kucharski.makao.server.messages.responses.game.ListResponse;
+import tech.kucharski.makao.util.MessageValidator;
 
 import java.util.UUID;
-
-import static tech.kucharski.makao.util.Utilities.validatePrimitives;
 
 /**
  * Lists all games the client takes part in.
@@ -23,7 +22,9 @@ public class ListRequest implements Request {
      * @throws InvalidRequestException When data is invalid.
      */
     public ListRequest(JsonObject jsonObject) throws InvalidRequestException {
-        if (!validatePrimitives(jsonObject, new String[]{"uuid"}))
+        if (!new MessageValidator()
+                .requirePrimitive("uuid", false)
+                .validate(jsonObject))
             throw new InvalidRequestException();
         try {
             this.reqID = UUID.fromString(jsonObject.get("uuid").getAsJsonPrimitive().getAsString());

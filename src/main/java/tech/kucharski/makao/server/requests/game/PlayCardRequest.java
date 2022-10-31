@@ -14,13 +14,13 @@ import tech.kucharski.makao.game.exceptions.WrongTurnException;
 import tech.kucharski.makao.server.InvalidRequestException;
 import tech.kucharski.makao.server.Request;
 import tech.kucharski.makao.server.messages.responses.ErrorResponse;
+import tech.kucharski.makao.util.MessageValidator;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import static tech.kucharski.makao.util.Logger.log;
-import static tech.kucharski.makao.util.Utilities.*;
 
 /**
  * Plays a card in a game.
@@ -35,10 +35,14 @@ public class PlayCardRequest implements Request {
      * @throws InvalidRequestException When data is invalid.
      */
     public PlayCardRequest(JsonObject jsonObject) throws InvalidRequestException {
-        if (!validatePrimitives(jsonObject, new String[]{"uuid", "playerID"}) ||
-                !validateArrays(jsonObject, new String[]{"cards"}) ||
-                !validatePrimitiveOrNull(jsonObject, new String[]{"request"}))
+        if (!new MessageValidator()
+                .requireArray("cards", false)
+                .requirePrimitive("uuid", false)
+                .requirePrimitive("playerID", false)
+                .requirePrimitive("request", true)
+                .validate(jsonObject)) {
             throw new InvalidRequestException();
+        }
 
         try {
             this.reqID = UUID.fromString(jsonObject.get("uuid").getAsJsonPrimitive().getAsString());
