@@ -14,6 +14,7 @@ import tech.kucharski.makao.server.messages.HeartbeatMessage;
 import tech.kucharski.makao.server.messages.HelloMessage;
 import tech.kucharski.makao.server.messages.responses.AckResponse;
 import tech.kucharski.makao.server.messages.responses.ErrorResponse;
+import tech.kucharski.makao.util.MessageValidator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
@@ -21,7 +22,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static tech.kucharski.makao.util.Logger.*;
-import static tech.kucharski.makao.util.Utilities.validatePrimitives;
 
 /**
  * Makao server
@@ -100,7 +100,10 @@ public class Server extends WebSocketServer {
             debug("[Server] Received message from " + conn.getRemoteSocketAddress() + ": " + message);
         }
         final JsonObject jsonObject = JsonParser.parseString(message).getAsJsonObject();
-        if (!validatePrimitives(jsonObject, new String[]{"req", "uuid"})) {
+        if (!new MessageValidator()
+                .requirePrimitive("req", false)
+                .requirePrimitive("uuid", false)
+                .validate(jsonObject)) {
             warning("[Server] Invalid message received.");
             sendError(conn, null, ErrorResponse.BAD_REQUEST);
             return;

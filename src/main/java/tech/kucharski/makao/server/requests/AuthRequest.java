@@ -6,10 +6,9 @@ import org.jetbrains.annotations.NotNull;
 import tech.kucharski.makao.Makao;
 import tech.kucharski.makao.server.InvalidRequestException;
 import tech.kucharski.makao.server.Request;
+import tech.kucharski.makao.util.MessageValidator;
 
 import java.util.UUID;
-
-import static tech.kucharski.makao.util.Utilities.validatePrimitives;
 
 /**
  * Changes ID of the client after reconnect.
@@ -23,7 +22,10 @@ public class AuthRequest implements Request {
      * @throws InvalidRequestException When data is invalid.
      */
     public AuthRequest(JsonObject jsonObject) throws InvalidRequestException {
-        if (!validatePrimitives(jsonObject, new String[]{"clientID", "uuid"}))
+        if (!new MessageValidator()
+                .requirePrimitive("clientID", false)
+                .requirePrimitive("uuid", false)
+                .validate(jsonObject))
             throw new InvalidRequestException();
         try {
             this.clientID = UUID.fromString(jsonObject.get("clientID").getAsJsonPrimitive().getAsString());

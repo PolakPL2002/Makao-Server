@@ -8,10 +8,9 @@ import tech.kucharski.makao.game.Game;
 import tech.kucharski.makao.server.InvalidRequestException;
 import tech.kucharski.makao.server.Request;
 import tech.kucharski.makao.server.messages.responses.ErrorResponse;
+import tech.kucharski.makao.util.MessageValidator;
 
 import java.util.UUID;
-
-import static tech.kucharski.makao.util.Utilities.validatePrimitives;
 
 /**
  * Makes player join a game.
@@ -24,7 +23,10 @@ public class JoinRequest implements Request {
      * @throws InvalidRequestException When data is invalid.
      */
     public JoinRequest(JsonObject jsonObject) throws InvalidRequestException {
-        if (!validatePrimitives(jsonObject, new String[]{"uuid", "gameID"}))
+        if (!new MessageValidator()
+                .requirePrimitive("gameID", false)
+                .requirePrimitive("uuid", false)
+                .validate(jsonObject))
             throw new InvalidRequestException();
         try {
             this.reqID = UUID.fromString(jsonObject.get("uuid").getAsJsonPrimitive().getAsString());
