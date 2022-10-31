@@ -1,7 +1,6 @@
 package tech.kucharski.makao.util;
 
 import com.google.common.io.ByteStreams;
-import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -228,48 +227,6 @@ public class Utilities {
             }
         }
         return queryPairs;
-    }
-
-    /**
-     * @param message Message to validate
-     * @param keys    Keys to validate
-     * @return Whether message contains all keys and they are arrays
-     */
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    @Deprecated
-    public static boolean validateArrays(@NotNull JsonObject message, @NotNull String[] keys) {
-        for (String key : keys)
-            if (!message.has(key) || !message.get(key).isJsonArray())
-                return false;
-        return true;
-    }
-
-    /**
-     * @param message Message to validate
-     * @param keys    Keys to validate
-     * @return Whether message contains all keys and they are primitives
-     */
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    @Deprecated
-    public static boolean validatePrimitiveOrNull(@NotNull JsonObject message, @NotNull String[] keys) {
-        for (String key : keys)
-            if (!message.has(key) || !(message.get(key).isJsonPrimitive() || message.get(key).isJsonNull()))
-                return false;
-        return true;
-    }
-
-    /**
-     * @param message Message to validate
-     * @param keys    Keys to validate
-     * @return Whether message contains all keys and they are primitives
-     */
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    @Deprecated
-    public static boolean validatePrimitives(@NotNull JsonObject message, @NotNull String[] keys) {
-        for (String key : keys)
-            if (!message.has(key) || !message.get(key).isJsonPrimitive())
-                return false;
-        return true;
     }
 }
 
