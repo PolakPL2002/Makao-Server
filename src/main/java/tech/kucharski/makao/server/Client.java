@@ -1,6 +1,6 @@
 package tech.kucharski.makao.server;
 
-import com.github.javafaker.Faker;
+import net.datafaker.Faker;
 import org.java_websocket.WebSocket;
 import org.jetbrains.annotations.NotNull;
 
@@ -31,7 +31,7 @@ public class Client {
     public Client(@NotNull UUID uuid) {
         this.uuid = uuid;
         avatar = UUID.randomUUID();
-        name = Faker.instance().funnyName().name();
+        name = new Faker().funnyName().name();
     }
 
     /**
