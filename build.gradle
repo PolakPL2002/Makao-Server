@@ -13,7 +13,7 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
     implementation 'org.jetbrains:annotations-java5:24.1.0'
-    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'com.google.code.gson:gson:2.11.0'
     implementation 'org.fusesource.jansi:jansi:2.4.1'
     implementation 'com.google.guava:guava:33.2.1-jre'
     implementation 'commons-io:commons-io:2.16.1'
